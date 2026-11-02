@@ -897,7 +897,7 @@ function AboutSection(): React.JSX.Element {
           <TerminalSquare size={22} />
         </div>
         <div>
-          <div className="text-[15px] font-semibold">XSSH</div>
+          <div className="text-[15px] font-semibold">kTerminal</div>
           <div className="mt-0.5 text-xs text-dim">版本 {version} · SSH 终端与 SFTP 文件传输</div>
         </div>
       </div>

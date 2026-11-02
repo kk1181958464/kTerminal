@@ -1,7 +1,8 @@
 {
-  "name": "xssh",
+  "name": "kterminal",
   "version": "1.0.0",
-  "description": "XSSH - SSH 终端与 SFTP 文件传输一体化工具",
+  "description": "kTerminal - SSH 终端与 SFTP 文件传输一体化工具",
+  "license": "MIT",
   "main": "./out/main/index.js",
   "author": "kk1181958464",
   "homepage": "https://github.com/kk1181958464/kTerminal",

@@ -54,7 +54,7 @@ export function Welcome(): React.JSX.Element {
               <TerminalSquare size={26} />
             </div>
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight">欢迎使用 XSSH</h1>
+              <h1 className="text-2xl font-semibold tracking-tight">欢迎使用 kTerminal</h1>
               <p className="mt-1 text-[13px] text-dim">SSH 终端与 SFTP 文件传输，一个窗口搞定</p>
             </div>
           </motion.div>

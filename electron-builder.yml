@@ -1,5 +1,5 @@
 appId: com.xssh.app
-productName: XSSH
+productName: kTerminal
 directories:
   buildResources: build
 files:
@@ -14,7 +14,7 @@ files:
 asarUnpack:
   - resources/**
 win:
-  executableName: XSSH
+  executableName: kTerminal
   icon: build/icon.ico
   target:
     - target: nsis
@@ -25,7 +25,7 @@ nsis:
   perMachine: false
   allowToChangeInstallationDirectory: true
   createStartMenuShortcut: true
-  artifactName: XSSH-${version}-setup.${ext}
+  artifactName: kTerminal-${version}-setup.${ext}
   shortcutName: ${productName}
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always

@@ -20,7 +20,7 @@ interface EditSession {
   timer?: NodeJS.Timeout
 }
 
-const ROOT = join(tmpdir(), 'xssh-edit')
+const ROOT = join(tmpdir(), 'kterminal-edit')
 const sessions = new Map<string, EditSession>()
 
 const editorNames: Record<string, string> = {

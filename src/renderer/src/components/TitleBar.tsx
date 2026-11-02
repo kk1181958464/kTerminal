@@ -43,7 +43,7 @@ export function TitleBar(): React.JSX.Element {
         <div className="grid h-[18px] w-[18px] place-items-center rounded-[5px] bg-accent text-accent-fg">
           <TerminalSquare size={11} strokeWidth={2.5} />
         </div>
-        <span className="text-[13px] font-semibold tracking-tight">XSSH</span>
+        <span className="text-[13px] font-semibold tracking-tight">kTerminal</span>
       </div>
       {tabs.length > 0 && <div className="mx-1 h-4 w-px shrink-0 bg-line" />}
 

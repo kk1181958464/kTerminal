@@ -1,4 +1,5 @@
 import { app, shell, BrowserWindow, ipcMain, dialog, Menu, Tray } from 'electron'
+import { cpSync, existsSync } from 'fs'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -11,6 +12,14 @@ import { cancelTransfer, clearTransfers, retryTransfer, startTransfer } from './
 import { openRemoteFile, releaseAll, releaseTab, resolveEditor } from './edit'
 import { getSettings, updateSettings } from './settings'
 import { importFonts, listFonts, readFont, removeFont } from './fonts'
+
+// Pin the data dir to "kTerminal" and carry over data from the pre-rename "XSSH" dir.
+if (!app.commandLine.hasSwitch('user-data-dir')) {
+  const userData = join(app.getPath('appData'), 'kTerminal')
+  const legacy = join(app.getPath('appData'), 'XSSH')
+  if (!existsSync(userData) && existsSync(legacy)) cpSync(legacy, userData, { recursive: true })
+  app.setPath('userData', userData)
+}
 
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
@@ -25,10 +34,10 @@ function showWindow(): void {
 
 function createTray(): void {
   tray = new Tray(process.platform === 'win32' ? trayIcon : trayPng)
-  tray.setToolTip('XSSH')
+  tray.setToolTip('kTerminal')
   tray.setContextMenu(
     Menu.buildFromTemplate([
-      { label: '显示 XSSH', click: showWindow },
+      { label: '显示 kTerminal', click: showWindow },
       { type: 'separator' },
       {
         label: '退出',
@@ -70,7 +79,7 @@ function createWindow(): void {
     e.preventDefault()
     win.hide()
     if (!settings.trayHintShown && process.platform === 'win32') {
-      tray?.displayBalloon({ iconType: 'info', title: 'XSSH 仍在运行', content: '已最小化到托盘，右键托盘图标可退出' })
+      tray?.displayBalloon({ iconType: 'info', title: 'kTerminal 仍在运行', content: '已最小化到托盘，右键托盘图标可退出' })
       updateSettings({ trayHintShown: true })
     }
   })

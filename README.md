@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="resources/icon.png" width="96" alt="XSSH" />
+  <img src="resources/icon.png" width="96" alt="kTerminal" />
 </p>
 
-<h1 align="center">XSSH</h1>
+<h1 align="center">kTerminal</h1>
 
 <p align="center">SSH 终端与 SFTP 文件传输一体化的桌面工具（Windows）</p>
 
@@ -18,7 +18,7 @@
 
 ## 下载
 
-在 [Releases](https://github.com/kk1181958464/kTerminal/releases) 页面下载 `XSSH-x.y.z-setup.exe` 安装即可。
+在 [Releases](https://github.com/kk1181958464/kTerminal/releases) 页面下载 `kTerminal-x.y.z-setup.exe` 安装即可。
 
 ## 开发
 
@@ -43,3 +43,7 @@ git push origin v1.0.1
 ## 技术栈
 
 Electron · React · TypeScript · Vite (electron-vite) · Tailwind CSS · Framer Motion · Zustand · ssh2 · xterm.js
+
+## 许可证
+
+[MIT](LICENSE)
