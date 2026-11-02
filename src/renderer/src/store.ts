@@ -1,11 +1,15 @@
 import { create } from 'zustand'
-import type { CustomFont, EditorInfo, Session, SessionInput, TransferTask } from '../../shared/types'
+import type { CustomFont, EditorInfo, LocalShell, Session, SessionInput, TransferTask } from '../../shared/types'
+import { useSettings } from './settings'
 
 export type TabStatus = 'auth' | 'connecting' | 'connected' | 'closed' | 'error'
 
 export interface Tab {
   id: string
+  /** 'local' tabs run a shell on this machine through a PTY and have no session. */
+  kind: 'ssh' | 'local'
   sessionId: string
+  shell?: LocalShell
   title: string
   status: TabStatus
   error?: string
@@ -36,6 +40,7 @@ export interface Toast {
 
 interface State {
   sessions: Session[]
+  localShells: LocalShell[]
   tabs: Tab[]
   activeTabId: string | null
   dialog: { session?: Session } | null
@@ -53,6 +58,8 @@ interface State {
   /** Share of the stacked file column taken by the local pane. */
   filePaneRatio: number
   toasts: Toast[]
+  /** Asks the TerminalView owning `id` to reconnect or disconnect (sent from the tab bar). */
+  tabRequest: { id: string; action: 'reconnect' | 'disconnect'; at: number } | null
   modal: ModalState | null
   menu: { x: number; y: number; items: (MenuItem | 'sep')[] } | null
 
@@ -60,6 +67,7 @@ interface State {
   saveSession(input: SessionInput): Promise<Session>
   deleteSession(id: string): Promise<void>
   openTab(session: Session): void
+  openLocalTab(shell?: LocalShell): void
   closeTab(id: string): void
   setActiveTab(id: string): void
   reorderTabs(tabs: Tab[]): void
@@ -89,6 +97,7 @@ export function toSessionInput(s: Session): SessionInput {
 
 export const useStore = create<State>((set, get) => ({
   sessions: [],
+  localShells: [],
   tabs: [],
   activeTabId: null,
   dialog: null,
@@ -104,6 +113,7 @@ export const useStore = create<State>((set, get) => ({
   // 0 and 1 are valid (a collapsed pane), so don't fall back on falsy values.
   filePaneRatio: Number(localStorage.getItem('filePaneRatio') ?? 0.5),
   toasts: [],
+  tabRequest: null,
   modal: null,
   menu: null,
 
@@ -124,10 +134,27 @@ export const useStore = create<State>((set, get) => ({
     const same = get().tabs.filter((t) => t.sessionId === session.id).length
     const tab: Tab = {
       id: crypto.randomUUID(),
+      kind: 'ssh',
       sessionId: session.id,
       title: same ? `${session.name} (${same + 1})` : session.name,
       status: 'connecting',
       filesOpen: localStorage.getItem('filesOpen') !== '0'
+    }
+    set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }))
+  },
+  openLocalTab(shell) {
+    const shells = get().localShells
+    const chosen = shell ?? shells.find((s) => s.id === useSettings.getState().defaultShell) ?? shells[0]
+    if (!chosen) return toast('未检测到可用的本地 Shell', 'error')
+    const same = get().tabs.filter((t) => t.kind === 'local' && t.shell?.id === chosen.id).length
+    const tab: Tab = {
+      id: crypto.randomUUID(),
+      kind: 'local',
+      sessionId: '',
+      shell: chosen,
+      title: same ? `${chosen.name} (${same + 1})` : chosen.name,
+      status: 'connecting',
+      filesOpen: false
     }
     set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }))
   },

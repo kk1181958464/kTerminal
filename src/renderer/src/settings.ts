@@ -58,6 +58,8 @@ export interface Settings {
   showHiddenFiles: boolean
   filePanelPosition: FilePanelPosition
   highlight: HighlightSettings
+  /** Local shell opened by default; null picks the first detected one. */
+  defaultShell: string | null
 }
 
 export const defaultSettings: Settings = {
@@ -77,7 +79,8 @@ export const defaultSettings: Settings = {
   rightClickPaste: true,
   showHiddenFiles: false,
   filePanelPosition: 'right',
-  highlight: defaultHighlight
+  highlight: defaultHighlight,
+  defaultShell: null
 }
 
 interface SettingsState extends Settings {

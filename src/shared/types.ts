@@ -96,8 +96,18 @@ export interface Api {
     read(id: string): Promise<Uint8Array>
     remove(id: string): Promise<void>
   }
+  pty: {
+    shells(): Promise<LocalShell[]>
+    /** Output, exit and input reuse the `ssh` channels, keyed by tab id. */
+    spawn(tabId: string, shellId: string, cols: number, rows: number): Promise<ConnectResult>
+  }
   appVersion(): Promise<string>
   getPathForFile(file: File): string
+}
+
+export interface LocalShell {
+  id: string
+  name: string
 }
 
 export interface CustomFont {

@@ -44,6 +44,7 @@ function App(): React.JSX.Element {
   useEffect(() => {
     loadSessions()
     loadCustomFonts()
+    window.api.pty.shells().then((localShells) => useStore.setState({ localShells }))
   }, [loadSessions])
 
   useEffect(() => window.api.transfer.onUpdate(upsertTransfer), [upsertTransfer])
@@ -66,6 +67,10 @@ function App(): React.JSX.Element {
         e.preventDefault()
         e.stopPropagation()
         useSettings.getState().setSettingsOpen(true)
+      } else if (e.ctrlKey && e.shiftKey && !e.altKey && e.code === 'KeyT') {
+        e.preventDefault()
+        e.stopPropagation()
+        useStore.getState().openLocalTab()
       }
     }
     window.addEventListener('keydown', onKey, true)

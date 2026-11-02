@@ -793,6 +793,8 @@ function TerminalSection(): React.JSX.Element {
         </div>
       </div>
 
+      <DefaultShellRow />
+
       <Group title="字体">
         <Row title="字体" desc="已导入的字体和本机已安装的等宽字体">
           <select
@@ -983,6 +985,29 @@ function ColorSlotPicker({
         )}
       </AnimatePresence>
     </div>
+  )
+}
+
+function DefaultShellRow(): React.JSX.Element {
+  const s = useSettings()
+  const shells = useStore((st) => st.localShells)
+  const current = shells.find((x) => x.id === s.defaultShell) ?? shells[0]
+  return (
+    <Group title="本地终端">
+      <Row title="默认 Shell" desc="点击侧边栏「本地终端」或按 Ctrl+Shift+T 时打开">
+        <select
+          value={current?.id ?? ''}
+          onChange={(e) => s.set({ defaultShell: e.target.value })}
+          className="input h-8 w-52 cursor-pointer"
+        >
+          {shells.map((x) => (
+            <option key={x.id} value={x.id}>
+              {x.name}
+            </option>
+          ))}
+        </select>
+      </Row>
+    </Group>
   )
 }
 

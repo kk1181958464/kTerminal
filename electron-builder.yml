@@ -13,6 +13,7 @@ files:
   - '!.github/*'
 asarUnpack:
   - resources/**
+  - node_modules/@lydell/**
 win:
   executableName: kTerminal
   icon: build/icon.ico

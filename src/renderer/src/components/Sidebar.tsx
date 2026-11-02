@@ -2,8 +2,10 @@ import { useMemo, useState } from 'react'
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
+  ChevronDown,
   ChevronRight,
   Copy,
+  Monitor,
   Moon,
   MoreHorizontal,
   Pencil,
@@ -74,6 +76,7 @@ export function Sidebar(): React.JSX.Element {
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto pr-2">
+          <LocalTerminalEntry />
           {sessions.length === 0 && (
             <div className="flex flex-col items-center px-4 pt-14 text-center">
               <div className="mb-3 grid h-11 w-11 place-items-center rounded-xl bg-fg/[0.05] text-dim">
@@ -151,6 +154,50 @@ export function Sidebar(): React.JSX.Element {
         </div>
       </div>
     </motion.aside>
+  )
+}
+
+function LocalTerminalEntry(): React.JSX.Element {
+  const shells = useStore((s) => s.localShells)
+  const openLocalTab = useStore((s) => s.openLocalTab)
+  const defaultShell = useSettings((s) => s.defaultShell)
+  const current = shells.find((s) => s.id === defaultShell) ?? shells[0]
+
+  return (
+    <div className="mb-3 flex items-center gap-1 border-b border-line pb-3">
+      <button
+        onClick={() => openLocalTab()}
+        title="打开本地终端 (Ctrl+Shift+T)"
+        className="group flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-lg px-1.5 py-1.5 text-left transition-colors hover:bg-fg/[0.05]"
+      >
+        <div className="grid h-[30px] w-[30px] shrink-0 place-items-center rounded-lg bg-accent/12 text-accent">
+          <Monitor size={15} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="truncate text-[13px] leading-tight text-fg">本地终端</div>
+          <div className="mt-0.5 truncate text-[11px] leading-tight text-dim">{current?.name ?? '检测中…'}</div>
+        </div>
+      </button>
+      {shells.length > 1 && (
+        <button
+          title="选择 Shell"
+          onClick={(e) =>
+            openMenuAt(
+              e.currentTarget,
+              shells.map((shell) => ({
+                label: shell.name,
+                icon: Monitor,
+                active: shell.id === current?.id,
+                onClick: () => openLocalTab(shell)
+              }))
+            )
+          }
+          className="icon-btn h-7 w-7"
+        >
+          <ChevronDown size={14} />
+        </button>
+      )}
+    </div>
   )
 }
 

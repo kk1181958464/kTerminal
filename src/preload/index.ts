@@ -72,6 +72,10 @@ const api: Api = {
     read: (id) => ipcRenderer.invoke('fonts:read', id),
     remove: (id) => ipcRenderer.invoke('fonts:remove', id)
   },
+  pty: {
+    shells: () => ipcRenderer.invoke('pty:shells'),
+    spawn: (tabId, shellId, cols, rows) => ipcRenderer.invoke('pty:spawn', tabId, shellId, cols, rows)
+  },
   appVersion: () => ipcRenderer.invoke('app:version'),
   getPathForFile: (file) => webUtils.getPathForFile(file)
 }

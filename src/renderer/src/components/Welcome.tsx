@@ -1,5 +1,5 @@
 import { motion, type Variants } from 'framer-motion'
-import { ArrowRight, FolderSync, Plus, ShieldCheck, TerminalSquare } from 'lucide-react'
+import { ArrowRight, FolderSync, Monitor, Plus, ShieldCheck, TerminalSquare } from 'lucide-react'
 import { useStore } from '../store'
 import { Avatar } from './ui'
 
@@ -22,6 +22,7 @@ const shortcuts: [string[], string][] = [
   [['Ctrl', 'Shift', 'C'], '复制'],
   [['Ctrl', 'Shift', 'V'], '粘贴'],
   [['Ctrl', ','], '打开设置'],
+  [['Ctrl', 'Shift', 'T'], '本地终端'],
   [['双击会话'], '快速连接']
 ]
 
@@ -29,6 +30,7 @@ export function Welcome(): React.JSX.Element {
   const sessions = useStore((s) => s.sessions)
   const openTab = useStore((s) => s.openTab)
   const openDialog = useStore((s) => s.openDialog)
+  const openLocalTab = useStore((s) => s.openLocalTab)
 
   return (
     <div className="absolute inset-0 pr-2 pb-2">
@@ -63,6 +65,10 @@ export function Welcome(): React.JSX.Element {
             <button onClick={() => openDialog()} className="btn btn-primary h-10 px-5">
               <Plus size={16} />
               新建会话
+            </button>
+            <button onClick={() => openLocalTab()} className="btn btn-ghost h-10 px-5">
+              <Monitor size={16} />
+              本地终端
             </button>
           </motion.div>
 

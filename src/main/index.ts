@@ -12,6 +12,7 @@ import { cancelTransfer, clearTransfers, retryTransfer, startTransfer } from './
 import { openRemoteFile, releaseAll, releaseTab, resolveEditor } from './edit'
 import { getSettings, updateSettings } from './settings'
 import { importFonts, listFonts, readFont, removeFont } from './fonts'
+import { closeAllLocal, closeLocal, listShells, resizeLocal, spawnLocal, writeLocal } from './pty'
 
 // Pin the data dir to "kTerminal" and carry over data from the pre-rename "XSSH" dir.
 if (!app.commandLine.hasSwitch('user-data-dir')) {
@@ -108,11 +109,16 @@ function registerIpc(): void {
   ipcMain.handle('ssh:connect', (e, tabId, sessionId, cols, rows, secret) =>
     connectShell(e.sender, tabId, sessionId, cols, rows, secret)
   )
-  ipcMain.on('ssh:write', (_e, tabId: string, data: string) => writeShell(tabId, data))
+  // A tab is either a local PTY or an SSH shell; the local helpers report whether they handled it.
+  ipcMain.on('ssh:write', (_e, tabId: string, data: string) => writeLocal(tabId, data) || writeShell(tabId, data))
   ipcMain.on('ssh:resize', (_e, tabId: string, cols: number, rows: number) =>
-    resizeShell(tabId, cols, rows)
+    resizeLocal(tabId, cols, rows) || resizeShell(tabId, cols, rows)
   )
-  ipcMain.on('ssh:close', (_e, tabId: string) => closeShell(tabId))
+  ipcMain.on('ssh:close', (_e, tabId: string) => closeLocal(tabId) || closeShell(tabId))
+  ipcMain.handle('pty:shells', () => listShells())
+  ipcMain.handle('pty:spawn', (e, tabId: string, shellId: string, cols: number, rows: number) =>
+    spawnLocal(e.sender, tabId, shellId, cols, rows)
+  )
 
   // Errors are rethrown with a readable message; Electron prefixes it, the renderer strips that.
   const handle = <A extends unknown[]>(
@@ -232,6 +238,7 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   closeAllShells()
+  closeAllLocal()
   releaseAll()
   if (process.platform !== 'darwin') {
     app.quit()

@@ -30,10 +30,14 @@ export function StatusBar(): React.JSX.Element {
             <StatusDot status={tab.status} />
             {statusMeta[tab.status].label}
           </span>
-          {session && (
-            <span className="px-1.5 font-mono">
-              {session.username}@{session.host}:{session.port}
-            </span>
+          {tab.kind === 'local' ? (
+            <span className="px-1.5">本地 · {tab.shell?.name}</span>
+          ) : (
+            session && (
+              <span className="px-1.5 font-mono">
+                {session.username}@{session.host}:{session.port}
+              </span>
+            )
           )}
           {tab.cols && tab.status === 'connected' && (
             <span className="px-1.5 tabular-nums">
@@ -52,7 +56,7 @@ export function StatusBar(): React.JSX.Element {
         icon={<Palette size={12} />}
         label={themeLabel(theme)}
       />
-      {tab && (
+      {tab?.kind === 'ssh' && (
         <BarButton
           active={tab.filesOpen}
           onClick={() => updateTab(tab.id, { filesOpen: !tab.filesOpen })}

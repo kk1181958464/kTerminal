@@ -1,7 +1,7 @@
 import clsx from 'clsx'
 import { Reorder } from 'framer-motion'
-import { PanelLeft, Plus, TerminalSquare, X } from 'lucide-react'
-import { openMenuAt, useStore, type MenuItem } from '../store'
+import { Ban, CopyPlus, Monitor, PanelLeft, PanelRightClose, Pencil, Plus, RotateCw, TerminalSquare, Unplug, X, XSquare } from 'lucide-react'
+import { openMenu, openMenuAt, useStore, type MenuItem, type Tab } from '../store'
 import { useSettings } from '../settings'
 import { StatusDot } from './StatusDot'
 
@@ -14,19 +14,68 @@ export function TitleBar(): React.JSX.Element {
   const reorderTabs = useStore((s) => s.reorderTabs)
   const openTab = useStore((s) => s.openTab)
   const openDialog = useStore((s) => s.openDialog)
+  const localShells = useStore((s) => s.localShells)
+  const openLocalTab = useStore((s) => s.openLocalTab)
   const collapsed = useSettings((s) => s.sidebarCollapsed)
   const setSettings = useSettings((s) => s.set)
 
   const quickConnect = (el: HTMLElement): void => {
-    const items: (MenuItem | 'sep')[] = sessions.slice(0, 12).map((s) => ({
-      label: s.name,
-      hint: `${s.username}@${s.host}`,
-      icon: TerminalSquare,
-      onClick: () => openTab(s)
+    const items: (MenuItem | 'sep')[] = localShells.map((shell) => ({
+      label: shell.name,
+      hint: '本地',
+      icon: Monitor,
+      onClick: () => openLocalTab(shell)
     }))
+    if (items.length && sessions.length) items.push('sep')
+    items.push(
+      ...sessions.slice(0, 12).map((s) => ({
+        label: s.name,
+        hint: `${s.username}@${s.host}`,
+        icon: TerminalSquare,
+        onClick: () => openTab(s)
+      }))
+    )
     if (items.length) items.push('sep')
     items.push({ label: '新建会话…', icon: Plus, onClick: () => openDialog() })
     openMenuAt(el, items)
+  }
+
+  const request = (id: string, action: 'reconnect' | 'disconnect'): void =>
+    useStore.setState({ tabRequest: { id, action, at: Date.now() } })
+
+  const tabMenu = (e: React.MouseEvent, tab: Tab): void => {
+    const local = tab.kind === 'local'
+    const session = sessions.find((s) => s.id === tab.sessionId)
+    const index = tabs.findIndex((t) => t.id === tab.id)
+    const items: (MenuItem | 'sep')[] = []
+    if (tab.status === 'connecting')
+      items.push({ label: '取消连接', icon: Ban, onClick: () => request(tab.id, 'disconnect') })
+    else if (tab.status === 'connected')
+      items.push({ label: local ? '结束进程' : '断开连接', icon: Unplug, onClick: () => request(tab.id, 'disconnect') })
+    else items.push({ label: local ? '重新启动' : '重新连接', icon: RotateCw, onClick: () => request(tab.id, 'reconnect') })
+    items.push({
+      label: '复制标签',
+      icon: CopyPlus,
+      disabled: !local && !session,
+      onClick: () => (local ? openLocalTab(tab.shell) : session && openTab(session))
+    })
+    if (session) items.push({ label: '编辑会话', icon: Pencil, onClick: () => openDialog(session) })
+    items.push('sep')
+    items.push({ label: '关闭', icon: X, hint: '鼠标中键', onClick: () => closeTab(tab.id) })
+    items.push({
+      label: '关闭其他标签',
+      icon: XSquare,
+      disabled: tabs.length < 2,
+      onClick: () => tabs.filter((t) => t.id !== tab.id).forEach((t) => closeTab(t.id))
+    })
+    items.push({
+      label: '关闭右侧标签',
+      icon: PanelRightClose,
+      disabled: index === tabs.length - 1,
+      onClick: () => tabs.slice(index + 1).forEach((t) => closeTab(t.id))
+    })
+    setActiveTab(tab.id)
+    openMenu(e, items)
   }
 
   return (
@@ -68,6 +117,7 @@ export function TitleBar(): React.JSX.Element {
               transition={{ type: 'spring', stiffness: 500, damping: 35 }}
               onPointerDown={() => setActiveTab(tab.id)}
               onAuxClick={(e) => e.button === 1 && closeTab(tab.id)}
+              onContextMenu={(e) => tabMenu(e, tab)}
               className={clsx(
                 'no-drag group relative flex h-7 max-w-[200px] min-w-[110px] shrink-0 cursor-default items-center gap-2 rounded-lg border pr-1 pl-2.5 text-[12.5px] transition-colors',
                 active

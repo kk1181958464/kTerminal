@@ -10,6 +10,8 @@ interface Connection {
   stream?: ClientChannel
   sftp?: Promise<SFTPWrapper>
   disposed?: boolean
+  /** Settles a still-pending connect immediately (used when the user cancels). */
+  cancel?: () => void
 }
 
 type SshError = Error & { code?: string; level?: string }
@@ -80,6 +82,7 @@ export function connectShell(
       client.end()
       resolve({ ok: false, ...describeError(err) })
     }
+    conn.cancel = () => fail(new Error('已取消'))
 
     client.on('ready', () => {
       client.shell({ term: 'xterm-256color', cols, rows }, (err, stream) => {
@@ -152,7 +155,10 @@ export function closeShell(tabId: string): void {
   if (!conn) return
   conn.disposed = true
   connections.delete(tabId)
-  conn.client.end()
+  conn.cancel?.()
+  // end() waits for a pending TCP handshake to time out; destroy() drops the socket right away.
+  if (!conn.stream) conn.client.destroy()
+  else conn.client.end()
 }
 
 export function closeAllShells(): void {

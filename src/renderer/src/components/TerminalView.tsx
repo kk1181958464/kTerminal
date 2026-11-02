@@ -78,10 +78,24 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
     window.addEventListener('mouseup', onUp)
   }
 
+  const canceledRef = useRef(false)
+
   const connect = async (secret?: string, remember = false): Promise<void> => {
     const term = termRef.current
     const fit = fitRef.current
     if (!term || !fit) return
+    if (tab.kind === 'local') {
+      updateTab(tab.id, { status: 'connecting', error: undefined })
+      fit.fit()
+      const res = await window.api.pty.spawn(tab.id, tab.shell?.id ?? '', term.cols, term.rows)
+      if (res.ok) {
+        updateTab(tab.id, { status: 'connected', cols: term.cols, rows: term.rows })
+        term.focus()
+      } else {
+        updateTab(tab.id, { status: 'error', error: res.error })
+      }
+      return
+    }
     if (!session) {
       updateTab(tab.id, { status: 'error', error: '会话不存在或已被删除' })
       return
@@ -95,8 +109,37 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
       if (remember && secret) saveSession({ ...toSessionInput(session), secret })
       term.focus()
     } else {
+      if (canceledRef.current) {
+        canceledRef.current = false
+        term.write('\x1b[2m—— 已取消连接 ——\x1b[0m\r\n')
+        updateTab(tab.id, { status: 'closed', error: '已取消' })
+        return
+      }
       updateTab(tab.id, { status: res.needAuth ? 'auth' : 'error', error: res.error })
     }
+  }
+
+  /** Connects, or asks for the password first when none is stored. */
+  function start(): void {
+    if (tab.kind === 'ssh' && session?.authType === 'password' && !session.hasSecret) {
+      updateTab(tab.id, { status: 'auth', error: undefined })
+    } else {
+      connect()
+    }
+  }
+
+  function disconnect(): void {
+    // A pending SSH connect resolves as a failure once closed; the flag turns that into "canceled".
+    if (tab.status === 'connecting') {
+      canceledRef.current = true
+      window.api.ssh.close(tab.id)
+      return
+    }
+    window.api.ssh.close(tab.id)
+    termRef.current?.write(
+      `\r\n\x1b[2m—— ${tab.kind === 'local' ? '进程已结束' : '已断开连接'} ——\x1b[0m\r\n`
+    )
+    updateTab(tab.id, { status: 'closed', error: undefined })
   }
 
   useEffect(() => {
@@ -172,12 +215,16 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
             { label: '粘贴', icon: ClipboardPaste, hint: 'Ctrl+Shift+V', onClick: paste },
             { label: '全选', icon: TextSelect, onClick: () => term.selectAll() },
             { label: '清屏', icon: Eraser, onClick: () => term.clear() },
-            'sep',
-            {
-              label: filesOpen ? '隐藏文件面板' : '显示文件面板',
-              icon: FolderOpen,
-              onClick: () => updateTab(tab.id, { filesOpen: !filesOpen })
-            }
+            ...(tab.kind === 'ssh'
+              ? [
+                  'sep' as const,
+                  {
+                    label: filesOpen ? '隐藏文件面板' : '显示文件面板',
+                    icon: FolderOpen,
+                    onClick: () => updateTab(tab.id, { filesOpen: !filesOpen })
+                  }
+                ]
+              : [])
           ]
         }
       })
@@ -192,7 +239,7 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
     const offData = window.api.ssh.onData((id, data) => id === tab.id && term.write(highlighter.process(data)))
     const offClosed = window.api.ssh.onClosed((id, reason) => {
       if (id !== tab.id) return
-      term.write('\r\n\x1b[2m—— 连接已断开 ——\x1b[0m\r\n')
+      term.write(`\r\n\x1b[2m—— ${tab.kind === 'local' ? '进程已退出' : '连接已断开'} ——\x1b[0m\r\n`)
       updateTab(tab.id, { status: 'closed', error: reason })
     })
     // Refit only once the size settles: refitting on every frame of a panel animation
@@ -211,11 +258,7 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
     })
     observer.observe(containerRef.current!)
 
-    if (session?.authType === 'password' && !session.hasSecret) {
-      updateTab(tab.id, { status: 'auth' })
-    } else {
-      connect()
-    }
+    start()
 
     const container = containerRef.current!
     return () => {
@@ -267,6 +310,14 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
     return () => media.removeEventListener('change', onChange)
   }, [settings.theme, settings.accent])
 
+  const tabRequest = useStore((s) => s.tabRequest)
+  useEffect(() => {
+    if (tabRequest?.id !== tab.id) return
+    if (tabRequest.action === 'reconnect') start()
+    else disconnect()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabRequest])
+
   useEffect(() => {
     if (!active) return
     requestAnimationFrame(() => {
@@ -308,7 +359,7 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
               className="absolute top-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-2 rounded-full border border-line bg-card/95 px-3.5 py-1.5 text-xs text-dim shadow-lg backdrop-blur"
             >
               <Loader2 size={13} className="animate-spin text-accent" />
-              正在连接…
+              {tab.kind === 'local' ? '正在启动…' : '正在连接…'}
             </motion.div>
           )}
           {tab.status === 'closed' && (
@@ -319,10 +370,11 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
               transition={spring}
               className="absolute bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 rounded-full border border-line bg-card/95 py-1 pr-1 pl-4 text-xs text-dim shadow-xl backdrop-blur"
             >
-              连接已断开{tab.error ? `：${tab.error}` : ''}
+              {tab.kind === 'local' ? '进程已退出' : '连接已断开'}
+              {tab.error ? `：${tab.error}` : ''}
               <button onClick={() => connect()} className="btn btn-primary h-7 rounded-full px-3 text-xs">
                 <RotateCw size={12} />
-                重新连接
+                {tab.kind === 'local' ? '重新启动' : '重新连接'}
               </button>
             </motion.div>
           )}
@@ -340,7 +392,7 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
               <div className="mb-4 grid h-10 w-10 place-items-center rounded-xl bg-err/10 text-err">
                 <AlertTriangle size={19} />
               </div>
-              <h3 className="text-[15px] font-medium">连接失败</h3>
+              <h3 className="text-[15px] font-medium">{tab.kind === 'local' ? '启动失败' : '连接失败'}</h3>
               <p className="mt-1.5 text-[13px] break-all text-dim">{tab.error}</p>
               <div className="mt-6 flex gap-2">
                 <button onClick={() => closeTab(tab.id)} className="btn btn-ghost flex-1">
@@ -361,7 +413,7 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
       </div>
 
       <AnimatePresence initial={false}>
-        {tab.filesOpen && (
+        {tab.kind === 'ssh' && tab.filesOpen && (
           <motion.div
             key={settings.filePanelPosition}
             initial={right ? { width: 0, opacity: 0 } : { height: 0, opacity: 0 }}

@@ -112,7 +112,7 @@ export class Highlighter {
     this.pending = ''
     let out = ''
     let i = 0
-    let endedWithText = false
+    let lastRun = ''
 
     while (i < data.length) {
       const ch = data[i]
@@ -144,7 +144,7 @@ export class Highlighter {
         }
         out += ch
         i++
-        endedWithText = false
+        lastRun = ''
         continue
       }
       let j = i
@@ -153,17 +153,19 @@ export class Highlighter {
       out += this.colorText(text, settings)
       this.lineTail = (this.lineTail + text).slice(-200)
       i = j
-      endedWithText = true
+      lastRun = text
     }
 
-    // A chunk that ends right after "...$ " is a shell prompt waiting for input.
+    // A chunk ending in "$ " is a prompt waiting for input. Prompts arrive in one write, whereas
+    // typed text is echoed char by char, so the prompt char and the space must share the final run
+    // (otherwise typing "echo %PATH% " would look like a zsh "% " prompt).
     if (
       settings.enabled &&
       settings.rules.command?.on &&
       !this.altScreen &&
-      endedWithText &&
       this.cmd === 'off' &&
-      PROMPT_END.test(this.lineTail)
+      lastRun.length >= 2 &&
+      PROMPT_END.test(lastRun)
     ) {
       this.cmd = 'name'
       this.cmdPos = 0
