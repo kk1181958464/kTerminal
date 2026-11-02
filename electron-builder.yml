@@ -32,6 +32,8 @@ nsis:
   createDesktopShortcut: always
 mac:
   category: public.app-category.developer-tools
+  # Used by the zip target; dmg sets its own name below.
+  artifactName: ${productName}-${version}-${arch}-mac.${ext}
   target:
     - target: dmg
       arch:
@@ -51,8 +53,6 @@ mac:
   notarize: false
 dmg:
   artifactName: ${productName}-${version}-${arch}.${ext}
-zip:
-  artifactName: ${productName}-${version}-${arch}-mac.${ext}
 linux:
   target:
     - target: AppImage
