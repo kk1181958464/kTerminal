@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebglAddon } from '@xterm/addon-webgl'
+import { WebLinksAddon } from '@xterm/addon-web-links'
 import { AnimatePresence, motion } from 'framer-motion'
 import clsx from 'clsx'
 import {
@@ -20,6 +21,7 @@ import type { Session } from '../../../shared/types'
 import { toSessionInput, useStore, type Tab } from '../store'
 import { terminalFontFamily, useSettings } from '../settings'
 import { termColors, terminalTheme } from '../theme'
+import { Highlighter } from '../highlight'
 import { FilePanel } from './FilePanel'
 
 const spring = { type: 'spring', stiffness: 380, damping: 38 } as const
@@ -111,6 +113,9 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
     })
     const fit = new FitAddon()
     term.loadAddon(fit)
+    // Ctrl+click opens links, so a plain click can still select text.
+    term.loadAddon(new WebLinksAddon((event, uri) => event.ctrlKey && window.open(uri)))
+    const highlighter = new Highlighter(() => useSettings.getState().highlight)
     term.open(containerRef.current!)
     try {
       const webgl = new WebglAddon()
@@ -184,7 +189,7 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
       window.api.ssh.resize(tab.id, cols, rows)
       updateTab(tab.id, { cols, rows })
     })
-    const offData = window.api.ssh.onData((id, data) => id === tab.id && term.write(data))
+    const offData = window.api.ssh.onData((id, data) => id === tab.id && term.write(highlighter.process(data)))
     const offClosed = window.api.ssh.onClosed((id, reason) => {
       if (id !== tab.id) return
       term.write('\r\n\x1b[2m—— 连接已断开 ——\x1b[0m\r\n')

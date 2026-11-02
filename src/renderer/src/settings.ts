@@ -4,6 +4,39 @@ import type { CustomScheme } from './theme'
 
 export type CursorStyle = 'block' | 'bar' | 'underline'
 export type FilePanelPosition = 'right' | 'bottom'
+export type HighlightRuleKey =
+  | 'url'
+  | 'ip'
+  | 'error'
+  | 'warning'
+  | 'success'
+  | 'datetime'
+  | 'number'
+  | 'path'
+  | 'string'
+  | 'command'
+
+export interface HighlightSettings {
+  enabled: boolean
+  /** `color` is an ANSI palette index (0–15) so highlights follow the active theme. */
+  rules: Record<HighlightRuleKey, { on: boolean; color: number }>
+}
+
+export const defaultHighlight: HighlightSettings = {
+  enabled: true,
+  rules: {
+    command: { on: true, color: 11 },
+    url: { on: true, color: 12 },
+    ip: { on: true, color: 13 },
+    error: { on: true, color: 9 },
+    warning: { on: true, color: 11 },
+    success: { on: true, color: 10 },
+    datetime: { on: true, color: 14 },
+    number: { on: true, color: 3 },
+    path: { on: true, color: 6 },
+    string: { on: true, color: 2 }
+  }
+}
 
 export interface Settings {
   /** A built-in ThemeId, 'system', or `custom:<schemeId>`. */
@@ -24,6 +57,7 @@ export interface Settings {
   rightClickPaste: boolean
   showHiddenFiles: boolean
   filePanelPosition: FilePanelPosition
+  highlight: HighlightSettings
 }
 
 export const defaultSettings: Settings = {
@@ -42,7 +76,8 @@ export const defaultSettings: Settings = {
   copyOnSelect: false,
   rightClickPaste: true,
   showHiddenFiles: false,
-  filePanelPosition: 'right'
+  filePanelPosition: 'right',
+  highlight: defaultHighlight
 }
 
 interface SettingsState extends Settings {

@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import clsx from 'clsx'
 import { AnimatePresence, motion } from 'framer-motion'
 import {
   ArrowLeft,
+  ChevronDown,
   Check,
   ClipboardCopy,
   ClipboardPaste,
@@ -40,6 +41,8 @@ import {
   type ThemeId
 } from '../theme'
 import { importCustomFonts, removeCustomFont } from '../fonts'
+import { commandRule, highlightRules } from '../highlight'
+import { defaultHighlight, type HighlightRuleKey } from '../settings'
 import { promptDialog } from '../store'
 import { Segmented, Switch } from './ui'
 
@@ -914,7 +917,143 @@ function TerminalSection(): React.JSX.Element {
           </select>
         </Row>
       </Group>
+      <HighlightGroup />
     </>
+  )
+}
+
+const paletteNames = ['黑', '红', '绿', '黄', '蓝', '品红', '青', '白']
+const pickable = [1, 2, 3, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15]
+
+function ColorSlotPicker({
+  value,
+  palette,
+  onChange
+}: {
+  value: number
+  palette: string[]
+  onChange: (index: number) => void
+}): React.JSX.Element {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent): void => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false)
+    }
+    window.addEventListener('mousedown', onDown)
+    return () => window.removeEventListener('mousedown', onDown)
+  }, [open])
+  const name = (i: number): string => (i >= 8 ? '亮' : '') + paletteNames[i % 8]
+  return (
+    <div ref={ref} className="relative">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        title={name(value)}
+        className="flex h-7 w-[86px] cursor-pointer items-center gap-1.5 rounded-md border border-line bg-panel px-2 text-[11.5px] text-dim hover:text-fg"
+      >
+        <span className="h-3.5 w-3.5 rounded-full" style={{ background: palette[value] }} />
+        {name(value)}
+        <ChevronDown size={12} className="ml-auto" />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            className="absolute top-8 right-0 z-10 grid grid-cols-7 gap-1.5 rounded-lg border border-line bg-card p-2 shadow-xl"
+          >
+            {pickable.map((i) => (
+              <button
+                key={i}
+                title={name(i)}
+                onClick={() => {
+                  onChange(i)
+                  setOpen(false)
+                }}
+                style={{
+                  background: palette[i],
+                  boxShadow: i === value ? `0 0 0 2px var(--c-card), 0 0 0 3.5px ${palette[i]}` : undefined
+                }}
+                className="h-5 w-5 cursor-pointer rounded-full transition-transform hover:scale-110"
+              />
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+function HighlightGroup(): React.JSX.Element {
+  const s = useSettings()
+  const hl = s.highlight
+  const colors = termColors(s.theme, s.accent)
+  const background = colors.background.startsWith('rgba') ? themes[resolveThemeId(s.theme)].ui.term : colors.background
+  const rule = (key: HighlightRuleKey): { on: boolean; color: number } => hl.rules[key] ?? defaultHighlight.rules[key]
+  const setRule = (key: HighlightRuleKey, patch: Partial<{ on: boolean; color: number }>): void =>
+    s.set({ highlight: { ...hl, rules: { ...hl.rules, [key]: { ...rule(key), ...patch } } } })
+
+  const rows = [
+    { key: commandRule.key, label: commandRule.label, sample: commandRule.sample, bold: true, underline: false },
+    ...highlightRules.map((r) => ({
+      key: r.key,
+      label: r.label,
+      sample: r.sample,
+      bold: r.key === 'error',
+      underline: r.key === 'url'
+    }))
+  ]
+
+  return (
+    <Group title="语法高亮">
+      <Row title="启用语法高亮" desc="按内容为输出着色；服务器已着色的文字和 vim、top 等全屏程序不受影响">
+        <Switch checked={hl.enabled} onChange={(v) => s.set({ highlight: { ...hl, enabled: v } })} />
+      </Row>
+      <div className={clsx('mt-1 space-y-1.5 transition-opacity', !hl.enabled && 'pointer-events-none opacity-40')}>
+        {rows.map(({ key, label, sample, bold, underline }) => {
+          const r = rule(key)
+          return (
+            <div key={key} className="flex items-center gap-3 rounded-lg px-1 py-1">
+              <Switch checked={r.on} onChange={(v) => setRule(key, { on: v })} />
+              <span className="w-24 shrink-0 text-[12.5px]">{label}</span>
+              <span
+                className="min-w-0 flex-1 truncate rounded-md px-2.5 py-1 font-mono text-[12px]"
+                style={{
+                  background,
+                  color: r.on ? colors.ansi[r.color] : colors.foreground,
+                  fontWeight: r.on && bold ? 700 : 400,
+                  textDecoration: r.on && underline ? 'underline' : 'none',
+                  fontFamily: terminalFontFamily(s.fontFamily)
+                }}
+              >
+                {key === 'command' ? (
+                  <>
+                    <span style={{ color: colors.ansi[2] }}>user@host</span>
+                    <span style={{ color: colors.foreground, fontWeight: 400 }}>:~$ </span>
+                    {sample.split(' ')[0]}
+                    <span style={{ color: colors.foreground, fontWeight: 400 }}> {sample.split(' ').slice(1).join(' ')}</span>
+                  </>
+                ) : (
+                  sample
+                )}
+              </span>
+              <ColorSlotPicker value={r.color} palette={colors.ansi} onChange={(color) => setRule(key, { color })} />
+            </div>
+          )
+        })}
+      </div>
+      <div className="mt-3 flex items-center justify-between text-[11.5px] text-dim">
+        <span>网址可按住 Ctrl 单击在浏览器中打开</span>
+        <button
+          onClick={() => s.set({ highlight: defaultHighlight })}
+          className="cursor-pointer hover:text-fg"
+        >
+          恢复默认高亮
+        </button>
+      </div>
+    </Group>
   )
 }
 
