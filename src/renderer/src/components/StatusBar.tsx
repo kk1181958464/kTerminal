@@ -3,6 +3,7 @@ import { ArrowUpDown, FolderOpen, Palette } from 'lucide-react'
 import { useStore } from '../store'
 import { useSettings } from '../settings'
 import { themeLabel } from '../theme'
+import { formatSize } from '../format'
 import { StatusDot, statusMeta } from './StatusDot'
 
 export function StatusBar(): React.JSX.Element {
@@ -12,9 +13,12 @@ export function StatusBar(): React.JSX.Element {
   const updateTab = useStore((s) => s.updateTab)
   const transfersOpen = useStore((s) => s.transfersOpen)
   const setTransfersOpen = useStore((s) => s.setTransfersOpen)
-  const activeTransfers = useStore(
-    (s) => s.transfers.filter((t) => t.status === 'running' || t.status === 'queued').length
-  )
+  const transfers = useStore((s) => s.transfers)
+  const active = transfers.filter((t) => t.status === 'running' || t.status === 'queued')
+  const total = active.reduce((sum, t) => sum + t.total, 0)
+  const done = active.reduce((sum, t) => sum + t.transferred, 0)
+  const speed = active.reduce((sum, t) => sum + t.speed, 0)
+  const percent = total ? Math.min(100, (done / total) * 100) : 0
   const theme = useSettings((s) => s.theme)
   const setSettingsOpen = useSettings((s) => s.setSettingsOpen)
 
@@ -49,21 +53,34 @@ export function StatusBar(): React.JSX.Element {
         label={themeLabel(theme)}
       />
       {tab && (
-        <>
-          <BarButton
-            active={tab.filesOpen}
-            onClick={() => updateTab(tab.id, { filesOpen: !tab.filesOpen })}
-            icon={<FolderOpen size={12} />}
-            label="文件"
-          />
-          <BarButton
-            active={transfersOpen}
-            onClick={() => setTransfersOpen(!transfersOpen)}
-            icon={<ArrowUpDown size={12} />}
-            label="传输"
-            badge={activeTransfers}
-          />
-        </>
+        <BarButton
+          active={tab.filesOpen}
+          onClick={() => updateTab(tab.id, { filesOpen: !tab.filesOpen })}
+          icon={<FolderOpen size={12} />}
+          label="文件"
+        />
+      )}
+      {(tab || transfers.length > 0) && (
+        <BarButton
+          toggle
+          active={transfersOpen}
+          onClick={() => setTransfersOpen(!transfersOpen)}
+          icon={<ArrowUpDown size={12} />}
+          label="传输"
+          badge={active.length}
+        >
+          {active.length > 0 && (
+            <span className="flex items-center gap-1.5 tabular-nums">
+              <span className="h-1 w-14 overflow-hidden rounded-full bg-fg/10">
+                <span
+                  className="block h-full rounded-full bg-accent transition-[width] duration-300"
+                  style={{ width: `${percent}%` }}
+                />
+              </span>
+              {percent.toFixed(0)}%{speed > 0 && ` · ${formatSize(speed)}/s`}
+            </span>
+          )}
+        </BarButton>
       )}
     </footer>
   )
@@ -75,7 +92,9 @@ function BarButton({
   icon,
   label,
   badge,
-  title
+  title,
+  toggle,
+  children
 }: {
   active?: boolean
   onClick: () => void
@@ -83,9 +102,13 @@ function BarButton({
   label: string
   badge?: number
   title?: string
+  /** Marks the transfer toggle so the popover's outside-click handler ignores it. */
+  toggle?: boolean
+  children?: React.ReactNode
 }): React.JSX.Element {
   return (
     <button
+      data-transfer-toggle={toggle || undefined}
       title={title}
       onClick={onClick}
       className={clsx(
@@ -95,6 +118,7 @@ function BarButton({
     >
       {icon}
       {label}
+      {children}
       {!!badge && (
         <span className="grid h-3.5 min-w-3.5 place-items-center rounded-full bg-accent px-1 text-[9.5px] font-semibold text-accent-fg">
           {badge}

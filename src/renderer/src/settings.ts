@@ -3,12 +3,15 @@ import { persist } from 'zustand/middleware'
 import type { CustomScheme } from './theme'
 
 export type CursorStyle = 'block' | 'bar' | 'underline'
+export type FilePanelPosition = 'right' | 'bottom'
 
 export interface Settings {
   /** A built-in ThemeId, 'system', or `custom:<schemeId>`. */
   theme: string
   customSchemes: CustomScheme[]
   accent: string | null
+  /** Overrides the terminal's default text color for every theme; null keeps the theme's. */
+  termForeground: string | null
   animations: boolean
   sidebarCollapsed: boolean
   fontFamily: string
@@ -20,12 +23,14 @@ export interface Settings {
   copyOnSelect: boolean
   rightClickPaste: boolean
   showHiddenFiles: boolean
+  filePanelPosition: FilePanelPosition
 }
 
 export const defaultSettings: Settings = {
   theme: 'graphite',
   customSchemes: [],
   accent: null,
+  termForeground: null,
   animations: true,
   sidebarCollapsed: false,
   fontFamily: 'Cascadia Mono',
@@ -36,7 +41,8 @@ export const defaultSettings: Settings = {
   scrollback: 10000,
   copyOnSelect: false,
   rightClickPaste: true,
-  showHiddenFiles: false
+  showHiddenFiles: false,
+  filePanelPosition: 'right'
 }
 
 interface SettingsState extends Settings {

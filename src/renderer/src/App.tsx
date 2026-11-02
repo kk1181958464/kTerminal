@@ -12,6 +12,7 @@ import { SessionDialog } from './components/SessionDialog'
 import { SettingsDialog } from './components/SettingsDialog'
 import { StatusBar } from './components/StatusBar'
 import { Overlays } from './components/Overlays'
+import { TransferPopover } from './components/TransferPopover'
 
 function useTheme(): void {
   const theme = useSettings((s) => s.theme)
@@ -85,6 +86,7 @@ function App(): React.JSX.Element {
           </main>
         </div>
         <StatusBar />
+        <TransferPopover />
         <SessionDialog />
         <SettingsDialog />
         <Overlays />

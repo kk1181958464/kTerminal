@@ -85,7 +85,7 @@ export interface Api {
   }
   window: {
     /** Recolors the native title bar overlay (min/max/close buttons). */
-    setTheme(background: string, symbol: string): void
+    setTheme(background: string, symbol: string, material: 'acrylic' | 'none'): void
     getCloseToTray(): Promise<boolean>
     setCloseToTray(value: boolean): void
   }

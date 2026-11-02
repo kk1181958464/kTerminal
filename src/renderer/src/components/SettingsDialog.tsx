@@ -14,6 +14,9 @@ import {
   Minus,
   Monitor,
   Palette,
+  PanelBottom,
+  Pipette,
+  PanelRight,
   RotateCcw,
   TerminalSquare,
   X,
@@ -23,9 +26,10 @@ import {
   TextCursor
 } from 'lucide-react'
 import { confirmDialog, toast, useStore } from '../store'
-import { terminalFontFamily, useSettings, type CursorStyle } from '../settings'
+import { terminalFontFamily, useSettings, type CursorStyle, type FilePanelPosition } from '../settings'
 import {
   accentPresets,
+  contrastRatio,
   fromWindowsTerminal,
   resolveThemeId,
   termColors,
@@ -198,9 +202,13 @@ function Row({
 
 function ThemePreview({ theme }: { theme: string }): React.JSX.Element {
   const t = themes[resolveThemeId(theme)]
-  const c = termColors(theme, null)
+  const c = termColors(theme, null, false)
+  // Glass themes are previewed over a colorful backdrop to show the translucency.
+  const backdrop = t.material
+    ? `linear-gradient(${t.ui.app}, ${t.ui.app}), linear-gradient(135deg, #ff9ab3, #8fb0ff 50%, #7fe3c6)`
+    : t.ui.app
   return (
-    <div className="flex h-full w-full" style={{ background: t.ui.app }}>
+    <div className="flex h-full w-full" style={{ background: backdrop }}>
       <div className="w-[28%] space-y-1.5 p-2">
         <div className="h-1.5 w-3/4 rounded-full" style={{ background: t.ui.line }} />
         <div className="h-1.5 w-1/2 rounded-full" style={{ background: t.ui.line }} />
@@ -316,7 +324,7 @@ function AppearanceSection(): React.JSX.Element {
       id,
       name: `我的配色 ${s.customSchemes.length + 1}`,
       base: resolveThemeId(s.theme),
-      colors: { ...termColors(s.theme, s.accent), ansi: [...termColors(s.theme, s.accent).ansi] }
+      colors: { ...termColors(s.theme, s.accent, false), ansi: [...termColors(s.theme, s.accent, false).ansi] }
     }
     s.set({ customSchemes: [...s.customSchemes, scheme], theme: `custom:${id}` })
     setEditing(id)
@@ -396,6 +404,8 @@ function AppearanceSection(): React.JSX.Element {
         </div>
       </Group>
 
+      <TermForegroundGroup />
+
       <Group title="界面">
         <Row title="界面动画" desc="关闭后所有过渡动画将立即完成">
           <Switch checked={s.animations} onChange={(v) => s.set({ animations: v })} />
@@ -406,6 +416,71 @@ function AppearanceSection(): React.JSX.Element {
         <CloseToTrayRow />
       </Group>
     </>
+  )
+}
+
+const foregroundPresets = ['#f2f2f2', '#9fe870', '#ffcf6b', '#7fd4ff', '#c8b6ff', '#ffadc6']
+
+function TermForegroundGroup(): React.JSX.Element {
+  const s = useSettings()
+  const base = termColors(s.theme, s.accent, false)
+  const current = s.termForeground ?? base.foreground
+  const ratio = contrastRatio(current, base.background.startsWith('rgba') ? themes[resolveThemeId(s.theme)].ui.term : base.background)
+  const isCustom = s.termForeground !== null && !foregroundPresets.includes(s.termForeground)
+
+  const swatch = (color: string, selected: boolean): React.CSSProperties => ({
+    background: color,
+    boxShadow: selected ? `0 0 0 2px var(--c-card), 0 0 0 4px ${color}` : 'inset 0 0 0 1px rgb(127 127 127 / 0.35)'
+  })
+
+  return (
+    <Group title="终端文字颜色">
+      <div className="flex flex-wrap items-center gap-2.5">
+        <button
+          title={`主题默认 ${base.foreground}`}
+          onClick={() => s.set({ termForeground: null })}
+          style={swatch(base.foreground, s.termForeground === null)}
+          className="relative grid h-7 w-7 cursor-pointer place-items-center rounded-full transition-transform hover:scale-110"
+        >
+          <span className="text-[9px] font-semibold" style={{ color: base.background.startsWith('rgba') ? '#000' : base.background }}>
+            默认
+          </span>
+        </button>
+        {foregroundPresets.map((color) => (
+          <button
+            key={color}
+            title={color}
+            onClick={() => s.set({ termForeground: color })}
+            style={swatch(color, s.termForeground === color)}
+            className="grid h-7 w-7 cursor-pointer place-items-center rounded-full transition-transform hover:scale-110"
+          >
+            {s.termForeground === color && <Check size={13} strokeWidth={3} className="text-black/70" />}
+          </button>
+        ))}
+        <label
+          title="自定义颜色"
+          style={isCustom ? swatch(s.termForeground!, true) : undefined}
+          className={clsx(
+            'relative grid h-7 w-7 cursor-pointer place-items-center overflow-hidden rounded-full transition-transform hover:scale-110',
+            !isCustom && 'border border-dashed border-fg/30 text-dim hover:text-fg'
+          )}
+        >
+          <Pipette size={13} className={isCustom ? 'text-black/70' : ''} />
+          <input
+            type="color"
+            value={current.startsWith('#') ? current.slice(0, 7) : '#ffffff'}
+            onChange={(e) => s.set({ termForeground: e.target.value })}
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+          />
+        </label>
+        <span className="ml-1 font-mono text-[11.5px] text-dim">{current}</span>
+      </div>
+      {ratio < 3 && (
+        <p className="mt-2.5 text-[11.5px] text-warn">
+          当前颜色与终端背景对比度较低（{ratio.toFixed(1)}:1），文字可能看不清
+        </p>
+      )}
+    </Group>
   )
 }
 
@@ -873,6 +948,17 @@ function FilesSection(): React.JSX.Element {
         </Row>
       </Group>
       <Group title="文件面板">
+        <Row title="文件面板位置" desc="右侧：终端保持完整高度，本地与远程上下排列；底部：本地与远程左右排列">
+          <Segmented<FilePanelPosition>
+            id="file-panel-position"
+            value={s.filePanelPosition}
+            onChange={(v) => s.set({ filePanelPosition: v })}
+            options={[
+              { value: 'right', label: '右侧', icon: PanelRight },
+              { value: 'bottom', label: '底部', icon: PanelBottom }
+            ]}
+          />
+        </Row>
         <Row title="默认显示隐藏文件" desc="以 . 开头的文件和文件夹，对新打开的面板生效">
           <Switch checked={s.showHiddenFiles} onChange={(v) => s.set({ showHiddenFiles: v })} />
         </Row>

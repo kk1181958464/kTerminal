@@ -49,6 +49,9 @@ interface State {
   /** Bumped whenever custom fonts finish loading so terminals re-measure glyphs. */
   fontsVersion: number
   filePanelHeight: number
+  filePanelWidth: number
+  /** Share of the stacked file column taken by the local pane. */
+  filePaneRatio: number
   toasts: Toast[]
   modal: ModalState | null
   menu: { x: number; y: number; items: (MenuItem | 'sep')[] } | null
@@ -67,6 +70,8 @@ interface State {
   clearTransfers(): Promise<void>
   setTransfersOpen(open: boolean): void
   setFilePanelHeight(height: number): void
+  setFilePanelWidth(width: number): void
+  setFilePaneRatio(ratio: number): void
 }
 
 export function toSessionInput(s: Session): SessionInput {
@@ -95,6 +100,9 @@ export const useStore = create<State>((set, get) => ({
   customFonts: [],
   fontsVersion: 0,
   filePanelHeight: Number(localStorage.getItem('filePanelHeight')) || 320,
+  filePanelWidth: Number(localStorage.getItem('filePanelWidth')) || 440,
+  // 0 and 1 are valid (a collapsed pane), so don't fall back on falsy values.
+  filePaneRatio: Number(localStorage.getItem('filePaneRatio') ?? 0.5),
   toasts: [],
   modal: null,
   menu: null,
@@ -151,13 +159,14 @@ export const useStore = create<State>((set, get) => ({
   },
 
   upsertTransfer(task) {
+    const prev = get().transfers.find((t) => t.id === task.id)
+    if (prev?.status !== task.status) announceTransfer(task, get().transfers)
     set((s) => {
       const exists = s.transfers.some((t) => t.id === task.id)
       return {
         transfers: exists
           ? s.transfers.map((t) => (t.id === task.id ? task : t))
           : [...s.transfers, task],
-        transfersOpen: exists ? s.transfersOpen : true,
         lastDone: task.status === 'done' ? task : s.lastDone
       }
     })
@@ -174,8 +183,29 @@ export const useStore = create<State>((set, get) => ({
   setFilePanelHeight(height) {
     localStorage.setItem('filePanelHeight', String(height))
     set({ filePanelHeight: height })
+  },
+  setFilePanelWidth(width) {
+    localStorage.setItem('filePanelWidth', String(width))
+    set({ filePanelWidth: width })
+  },
+  setFilePaneRatio(ratio) {
+    localStorage.setItem('filePaneRatio', String(ratio))
+    set({ filePaneRatio: ratio })
   }
 }))
+
+let batchDone = 0
+function announceTransfer(task: TransferTask, all: TransferTask[]): void {
+  if (task.status === 'error') toast(`传输失败：${task.name}（${task.error}）`, 'error')
+  if (task.status !== 'done') return
+  batchDone++
+  const stillActive = all.some(
+    (t) => t.id !== task.id && (t.status === 'running' || t.status === 'queued')
+  )
+  if (stillActive) return
+  toast(batchDone > 1 ? `${batchDone} 个传输已完成` : `传输完成：${task.name}`, 'success')
+  batchDone = 0
+}
 
 let toastId = 0
 export function toast(text: string, kind: Toast['kind'] = 'info'): void {

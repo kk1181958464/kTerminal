@@ -1,11 +1,23 @@
 import type { ITheme } from '@xterm/xterm'
 import { useSettings } from './settings'
 
-export type ThemeId = 'graphite' | 'tokyo' | 'mocha' | 'nord' | 'github-light' | 'solarized-light'
+export type ThemeId =
+  | 'graphite'
+  | 'tokyo'
+  | 'mocha'
+  | 'nord'
+  | 'github-light'
+  | 'solarized-light'
+  | 'glass-dark'
+  | 'glass-light'
 
 interface ThemeDef {
   name: string
   dark: boolean
+  /** Native Windows backdrop; the UI colors are translucent so it shows through. */
+  material?: 'acrylic'
+  /** Window control (min/max/close) glyph color when `dim` is translucent. */
+  symbol?: string
   ui: {
     app: string
     term: string
@@ -98,6 +110,36 @@ export const themes: Record<ThemeId, ThemeDef> = {
     termFg: '#586e75',
     ansi: ['#073642', '#dc322f', '#859900', '#b58900', '#268bd2', '#d33682', '#2aa198', '#93a1a1'],
     bright: ['#002b36', '#cb4b16', '#586e75', '#657b83', '#839496', '#6c71c4', '#93a1a1', '#fdf6e3']
+  },
+  'glass-dark': {
+    name: '玻璃 · 深色',
+    dark: true,
+    material: 'acrylic',
+    symbol: '#c9ccd6',
+    ui: {
+      app: 'rgba(14, 16, 24, 0.30)', term: 'rgba(10, 12, 18, 0.46)', panel: 'rgba(255, 255, 255, 0.06)',
+      card: 'rgba(30, 33, 45, 0.94)', line: 'rgba(255, 255, 255, 0.10)',
+      fg: '#eef0f6', dim: 'rgba(228, 232, 242, 0.62)', accent: '#7aa2ff', accentFg: '#0d1020',
+      ok: '#4ade94', err: '#ff6b74', warn: '#fbbf4d', folder: '#f5c95c'
+    },
+    termFg: '#e4e7ef',
+    ansi: ['#3a3f50', '#ff6b74', '#4ade94', '#fbd36b', '#7aa2ff', '#c39bff', '#5fd8e6', '#d6d9e3'],
+    bright: ['#6b7186', '#ff8f96', '#7eeab5', '#ffe08f', '#9fbcff', '#d6b8ff', '#8ee6f0', '#ffffff']
+  },
+  'glass-light': {
+    name: '玻璃 · 浅色',
+    dark: false,
+    material: 'acrylic',
+    symbol: '#3a3f4a',
+    ui: {
+      app: 'rgba(246, 248, 252, 0.36)', term: 'rgba(255, 255, 255, 0.50)', panel: 'rgba(0, 0, 0, 0.04)',
+      card: 'rgba(255, 255, 255, 0.95)', line: 'rgba(0, 0, 0, 0.09)',
+      fg: '#141820', dim: 'rgba(20, 24, 34, 0.58)', accent: '#2f6bff', accentFg: '#ffffff',
+      ok: '#178a45', err: '#d4303a', warn: '#a36a00', folder: '#d9a514'
+    },
+    termFg: '#1a1f29',
+    ansi: ['#24292f', '#cf222e', '#116329', '#7a4d00', '#0969da', '#8250df', '#1b7c83', '#6e7781'],
+    bright: ['#57606a', '#a40e26', '#1a7f37', '#633c01', '#218bff', '#a475f9', '#3192aa', '#8c959f']
   }
 }
 
@@ -137,18 +179,38 @@ export function themeLabel(theme: string): string {
   return findScheme(theme)?.name ?? themes[resolveThemeId(theme)].name
 }
 
-export function termColors(theme: string, accent: string | null): TermColors {
+/** `withOverride` applies the user's terminal text color; theme previews pass false. */
+export function termColors(theme: string, accent: string | null, withOverride = true): TermColors {
+  const override = withOverride ? useSettings.getState().termForeground : null
   const scheme = findScheme(theme)
-  if (scheme) return scheme.colors
+  if (scheme) return override ? { ...scheme.colors, foreground: override } : scheme.colors
   const t = themes[resolveThemeId(theme)]
   const cursor = accent ?? t.ui.accent
   return {
     background: t.ui.term,
-    foreground: t.termFg,
+    foreground: override ?? t.termFg,
     cursor,
     selection: cursor,
     ansi: [...t.ansi, ...t.bright]
   }
+}
+
+function luminance(color: string): number {
+  const m = color.match(/^#([0-9a-f]{6})/i)
+  const rgb = m
+    ? [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16))
+    : (color.match(/\d+(\.\d+)?/g) ?? ['0', '0', '0']).slice(0, 3).map(Number)
+  const [r, g, b] = rgb.map((v) => {
+    const c = v / 255
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+  })
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+}
+
+/** WCAG contrast ratio between two colors (1–21). */
+export function contrastRatio(a: string, b: string): number {
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x)
+  return (hi + 0.05) / (lo + 0.05)
 }
 
 function withAlpha(hex: string, alpha: number): string {
@@ -161,11 +223,14 @@ export function terminalTheme(theme: string, accent: string | null): ITheme {
   const dark = themes[resolveThemeId(theme)].dark
   const [black, red, green, yellow, blue, magenta, cyan, white] = c.ansi
   const [bBlack, bRed, bGreen, bYellow, bBlue, bMagenta, bCyan, bWhite] = c.ansi.slice(8)
+  // A translucent background can't be the glyph color under a block cursor.
+  const opaque = !c.background.startsWith('rgba')
   return {
-    background: c.background,
+    // Translucent themes tint the terminal card instead; painting it twice would turn it opaque.
+    background: opaque ? c.background : 'rgba(0, 0, 0, 0)',
     foreground: c.foreground,
     cursor: c.cursor,
-    cursorAccent: c.background,
+    cursorAccent: opaque ? c.background : dark ? '#0d1020' : '#ffffff',
     selectionBackground: withAlpha(c.selection, dark ? 0.32 : 0.25),
     black, red, green, yellow, blue, magenta, cyan, white,
     brightBlack: bBlack, brightRed: bRed, brightGreen: bGreen, brightYellow: bYellow,
@@ -247,5 +312,5 @@ export function applyTheme(id: ThemeId, accent: string | null, animate: boolean)
   for (const [k, v] of Object.entries(vars)) root.style.setProperty(`--c-${k}`, v)
   root.style.colorScheme = t.dark ? 'dark' : 'light'
   root.dataset.dark = String(t.dark)
-  window.api.window.setTheme(t.ui.app, t.ui.dim)
+  window.api.window.setTheme(t.ui.app, t.symbol ?? t.ui.dim, t.material ?? 'none')
 }

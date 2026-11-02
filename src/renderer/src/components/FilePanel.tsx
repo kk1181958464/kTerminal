@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import clsx from 'clsx'
 import {
   ArrowUp,
   ChevronDown,
+  ChevronUp,
   Copy,
   Download,
   FilePen,
@@ -89,7 +90,23 @@ function EntryIcon({ entry, kind }: { entry: FileEntry; kind: Kind }): React.JSX
   return <Icon size={15} className="shrink-0 text-dim" />
 }
 
-export function FilePanel({ tab, host }: { tab: Tab; host: string }): React.JSX.Element {
+export function FilePanel({
+  tab,
+  host,
+  stacked
+}: {
+  tab: Tab
+  host: string
+  /** Local above remote (right-side column) instead of side by side. */
+  stacked: boolean
+}): React.JSX.Element {
+  const ratio = useStore((s) => s.filePaneRatio)
+  const setRatio = useStore((s) => s.setFilePaneRatio)
+  const columnRef = useRef<HTMLDivElement>(null)
+  const [dragRatio, setDragRatio] = useState<number | null>(null)
+  // Dragging close to either edge collapses that pane to a title bar.
+  const snap = (v: number): number => (v < 0.12 ? 0 : v > 0.88 ? 1 : v)
+  const localShare = snap(dragRatio ?? ratio)
   const connected = tab.status === 'connected'
   const [localPath, setLocalPath] = useState<string | null>(null)
   const [remotePath, setRemotePath] = useState<string | null>(null)
@@ -135,8 +152,27 @@ export function FilePanel({ tab, host }: { tab: Tab; host: string }): React.JSX.
     [tab.id]
   )
 
-  return (
-    <div className="flex h-full gap-2">
+  const startSplit = (e: React.MouseEvent): void => {
+    e.preventDefault()
+    const rect = columnRef.current!.getBoundingClientRect()
+    let latest = localShare
+    const onMove = (ev: MouseEvent): void => {
+      latest = Math.min(1, Math.max(0, (ev.clientY - rect.top) / rect.height))
+      setDragRatio(latest)
+    }
+    const onUp = (): void => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      document.body.style.cursor = ''
+      setRatio(snap(latest))
+      setDragRatio(null)
+    }
+    document.body.style.cursor = 'row-resize'
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
+
+  const localPane = (
       <FilePane
         kind="local"
         tabId={tab.id}
@@ -148,6 +184,8 @@ export function FilePanel({ tab, host }: { tab: Tab; host: string }): React.JSX.
         onSend={(paths) => transfer('upload', paths, remotePath)}
         onReceive={(paths, dir) => transfer('download', paths, dir)}
       />
+  )
+  const remotePane = (
       <FilePane
         kind="remote"
         tabId={tab.id}
@@ -159,7 +197,75 @@ export function FilePanel({ tab, host }: { tab: Tab; host: string }): React.JSX.
         onSend={(paths) => transfer('download', paths, localPath)}
         onReceive={(paths, dir) => transfer('upload', paths, dir)}
       />
+  )
+
+  if (!stacked)
+    return (
+      <div className="flex h-full gap-2">
+        {localPane}
+        {remotePane}
+      </div>
+    )
+
+  const localCollapsed = localShare === 0
+  const remoteCollapsed = localShare === 1
+
+  // Collapsed panes stay mounted (hidden) so their selection and scroll survive.
+  return (
+    <div ref={columnRef} className="flex h-full flex-col">
+      {localCollapsed && <CollapsedPane kind="local" title="本地" onExpand={() => setRatio(0.5)} />}
+      <div
+        style={
+          localCollapsed
+            ? { display: 'none' }
+            : remoteCollapsed
+              ? undefined
+              : { height: `calc(${localShare * 100}% - 4px)` }
+        }
+        className={clsx('flex min-h-0', remoteCollapsed ? 'flex-1' : 'shrink-0')}
+      >
+        {localPane}
+      </div>
+      <div
+        onMouseDown={startSplit}
+        onDoubleClick={() => setRatio(0.5)}
+        title="拖动调整比例，拖到顶部或底部可收起一栏，双击恢复"
+        className="group flex h-2 shrink-0 cursor-row-resize items-center justify-center"
+      >
+        <div className="h-[3px] w-10 rounded-full bg-fg/10 transition-colors group-hover:bg-accent/70" />
+      </div>
+      <div style={remoteCollapsed ? { display: 'none' } : undefined} className="flex min-h-0 flex-1">
+        {remotePane}
+      </div>
+      {remoteCollapsed && <CollapsedPane kind="remote" title={host} onExpand={() => setRatio(0.5)} />}
     </div>
+  )
+}
+
+function CollapsedPane({
+  kind,
+  title,
+  onExpand
+}: {
+  kind: Kind
+  title: string
+  onExpand: () => void
+}): React.JSX.Element {
+  const Icon = kind === 'remote' ? Server : Monitor
+  const Arrow = kind === 'remote' ? ChevronUp : ChevronDown
+  return (
+    <button
+      onClick={onExpand}
+      title="展开"
+      className="surface flex h-8 shrink-0 cursor-pointer items-center gap-2 px-3 text-[12px] text-dim transition-colors hover:border-fg/15 hover:text-fg"
+    >
+      <Icon size={12} />
+      <span className="truncate">{title}</span>
+      <span className="ml-auto flex items-center gap-1 text-[11px]">
+        展开
+        <Arrow size={12} />
+      </span>
+    </button>
   )
 }
 
@@ -194,6 +300,14 @@ function FilePane({ kind, tabId, title, api, path, setPath, ready, onSend, onRec
   const editor = useStore((s) => s.editor)
   const other: Kind = kind === 'local' ? 'remote' : 'local'
   const isRemote = kind === 'remote'
+  const rootRef = useRef<HTMLDivElement>(null)
+  const [paneWidth, setPaneWidth] = useState(600)
+
+  useEffect(() => {
+    const observer = new ResizeObserver(([entry]) => setPaneWidth(entry.contentRect.width))
+    observer.observe(rootRef.current!)
+    return () => observer.disconnect()
+  }, [])
 
   const load = useCallback(
     async (dir: string) => {
@@ -459,7 +573,12 @@ function FilePane({ kind, tabId, title, api, path, setPath, ready, onSend, onRec
     e.dataTransfer.effectAllowed = 'copy'
   }
 
-  const cols = isRemote ? 'grid-cols-[minmax(0,1fr)_76px_128px_86px]' : 'grid-cols-[minmax(0,1fr)_76px_128px]'
+  // Narrow panes (e.g. the right-side column) drop the less important columns.
+  const showTime = paneWidth >= 380
+  const showPerm = isRemote && paneWidth >= 500
+  const gridTemplateColumns = ['minmax(0,1fr)', '72px', showTime && '124px', showPerm && '86px']
+    .filter(Boolean)
+    .join(' ')
   const selectedSize = selection.reduce((sum, e) => sum + (e.isDir ? 0 : e.size), 0)
 
   const header = (key: SortKey, label: string, align = ''): React.JSX.Element => (
@@ -474,6 +593,7 @@ function FilePane({ kind, tabId, title, api, path, setPath, ready, onSend, onRec
 
   return (
     <div
+      ref={rootRef}
       tabIndex={0}
       onKeyDown={onKeyDown}
       data-pane={kind}
@@ -544,11 +664,14 @@ function FilePane({ kind, tabId, title, api, path, setPath, ready, onSend, onRec
         </button>
       </div>
 
-      <div className={clsx('grid shrink-0 gap-3 border-b border-line bg-panel/40 px-3 py-1.5 text-[11px] text-dim', cols)}>
+      <div
+        style={{ gridTemplateColumns }}
+        className="grid shrink-0 gap-3 border-b border-line bg-panel/40 px-3 py-1.5 text-[11px] text-dim"
+      >
         {header('name', '名称', 'text-left')}
         {header('size', '大小', 'text-right')}
-        {header('mtime', '修改时间', 'text-left')}
-        {isRemote && <span>权限</span>}
+        {showTime && header('mtime', '修改时间', 'text-left')}
+        {showPerm && <span>权限</span>}
       </div>
 
       <div
@@ -579,9 +702,10 @@ function FilePane({ kind, tabId, title, api, path, setPath, ready, onSend, onRec
               }}
               onDoubleClick={() => open(entry)}
               onContextMenu={(e) => rowMenu(e, entry)}
+              title={showTime ? undefined : `${entry.name}\n${formatTime(entry.mtime)}${entry.permissions ? `  ${entry.permissions}` : ''}`}
+              style={{ gridTemplateColumns }}
               className={clsx(
                 'mx-1 grid h-7 cursor-default items-center gap-3 rounded-md px-2 text-[12.5px] transition-colors duration-100',
-                cols,
                 dropTarget === entry.path
                   ? 'bg-accent/20 ring-1 ring-accent'
                   : selected.has(entry.path)
@@ -596,8 +720,8 @@ function FilePane({ kind, tabId, title, api, path, setPath, ready, onSend, onRec
               <span className="text-right text-[11.5px] text-dim tabular-nums">
                 {entry.isDir ? '' : formatSize(entry.size)}
               </span>
-              <span className="truncate text-[11.5px] text-dim tabular-nums">{formatTime(entry.mtime)}</span>
-              {isRemote && <span className="font-mono text-[11px] text-dim/80">{entry.permissions}</span>}
+              {showTime && <span className="truncate text-[11.5px] text-dim tabular-nums">{formatTime(entry.mtime)}</span>}
+              {showPerm && <span className="font-mono text-[11px] text-dim/80">{entry.permissions}</span>}
             </div>
           ))
         )}

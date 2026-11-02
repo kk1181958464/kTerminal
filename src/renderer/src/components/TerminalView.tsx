@@ -4,6 +4,7 @@ import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import { WebglAddon } from '@xterm/addon-webgl'
 import { AnimatePresence, motion } from 'framer-motion'
+import clsx from 'clsx'
 import {
   AlertTriangle,
   ClipboardPaste,
@@ -18,9 +19,8 @@ import {
 import type { Session } from '../../../shared/types'
 import { toSessionInput, useStore, type Tab } from '../store'
 import { terminalFontFamily, useSettings } from '../settings'
-import { terminalTheme } from '../theme'
+import { termColors, terminalTheme } from '../theme'
 import { FilePanel } from './FilePanel'
-import { TransferDrawer } from './TransferDrawer'
 
 const spring = { type: 'spring', stiffness: 380, damping: 38 } as const
 
@@ -36,34 +36,42 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
   const openDialog = useStore((s) => s.openDialog)
   const filePanelHeight = useStore((s) => s.filePanelHeight)
   const setFilePanelHeight = useStore((s) => s.setFilePanelHeight)
+  const filePanelWidth = useStore((s) => s.filePanelWidth)
+  const setFilePanelWidth = useStore((s) => s.setFilePanelWidth)
   const settings = useSettings()
   const fontsVersion = useStore((s) => s.fontsVersion)
   const termTheme = useMemo(
     () => terminalTheme(settings.theme, settings.accent),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [settings.theme, settings.accent, settings.customSchemes]
+    [settings.theme, settings.accent, settings.customSchemes, settings.termForeground]
   )
-  const [dragHeight, setDragHeight] = useState<number | null>(null)
-  const panelHeight = dragHeight ?? filePanelHeight
+  const right = settings.filePanelPosition === 'right'
+  const [dragSize, setDragSize] = useState<number | null>(null)
+  const panelSize = dragSize ?? (right ? filePanelWidth : filePanelHeight)
 
   const startResize = (e: React.MouseEvent): void => {
     e.preventDefault()
-    const startY = e.clientY
-    const startHeight = panelHeight
-    const max = (rootRef.current?.clientHeight ?? 600) - 160
-    let latest = startHeight
+    const start = right ? e.clientX : e.clientY
+    const startSize = panelSize
+    const root = rootRef.current!
+    // Always leave the terminal a usable area.
+    const max = right ? root.clientWidth - 380 : root.clientHeight - 160
+    const min = right ? 300 : 180
+    let latest = startSize
     const onMove = (ev: MouseEvent): void => {
-      latest = Math.round(Math.max(180, Math.min(max, startHeight + startY - ev.clientY)))
-      setDragHeight(latest)
+      const delta = start - (right ? ev.clientX : ev.clientY)
+      latest = Math.round(Math.max(min, Math.min(max, startSize + delta)))
+      setDragSize(latest)
     }
     const onUp = (): void => {
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseup', onUp)
       document.body.style.cursor = ''
-      setFilePanelHeight(latest)
-      setDragHeight(null)
+      if (right) setFilePanelWidth(latest)
+      else setFilePanelHeight(latest)
+      setDragSize(null)
     }
-    document.body.style.cursor = 'row-resize'
+    document.body.style.cursor = right ? 'col-resize' : 'row-resize'
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp)
   }
@@ -98,6 +106,7 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
       cursorStyle: s.cursorStyle,
       cursorBlink: s.cursorBlink,
       scrollback: s.scrollback,
+      allowTransparency: true,
       theme: terminalTheme(s.theme, s.accent)
     })
     const fit = new FitAddon()
@@ -181,8 +190,19 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
       term.write('\r\n\x1b[2m—— 连接已断开 ——\x1b[0m\r\n')
       updateTab(tab.id, { status: 'closed', error: reason })
     })
+    // Refit only once the size settles: refitting on every frame of a panel animation
+    // re-renders the canvas and resizes the remote PTY each time, which flickers.
+    let fitTimer: number | undefined
     const observer = new ResizeObserver(() => {
-      if (containerRef.current?.clientWidth) fit.fit()
+      clearTimeout(fitTimer)
+      fitTimer = window.setTimeout(() => {
+        if (!containerRef.current?.clientWidth) return
+        // Re-wrapping lines on a width change can leave the viewport mid-row; stay pinned to the prompt.
+        const buffer = term.buffer.active
+        const atBottom = buffer.viewportY >= buffer.baseY
+        fit.fit()
+        if (atBottom) term.scrollToBottom()
+      }, 120)
     })
     observer.observe(containerRef.current!)
 
@@ -194,6 +214,7 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
 
     const container = containerRef.current!
     return () => {
+      clearTimeout(fitTimer)
       observer.disconnect()
       container.removeEventListener('contextmenu', onContextMenu)
       offData()
@@ -261,13 +282,17 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
           : { opacity: 0, transitionEnd: { visibility: 'hidden' } }
       }
       transition={{ duration: 0.16 }}
-      className="absolute inset-0 flex flex-col pr-2 pb-2"
+      className={clsx('absolute inset-0 flex pr-2 pb-2', right ? 'flex-row' : 'flex-col')}
     >
       <div
-        className="surface relative min-h-[120px] flex-1 overflow-hidden"
-        style={{ background: termTheme.background }}
+        className="surface relative min-h-[120px] min-w-[240px] flex-1 overflow-hidden"
+        style={{ background: termColors(settings.theme, settings.accent).background }}
       >
-        <div ref={containerRef} className="absolute inset-0 py-2.5 pl-3.5" />
+        {/* Padding lives on the wrapper: FitAddon measures the parent's border-box height, so
+            padding on the parent itself would be counted as space and clip the last row. */}
+        <div className="absolute inset-0 py-2.5 pl-3.5">
+          <div ref={containerRef} className="h-full w-full" />
+        </div>
 
         <AnimatePresence>
           {tab.status === 'connecting' && (
@@ -333,28 +358,39 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
       <AnimatePresence initial={false}>
         {tab.filesOpen && (
           <motion.div
-            key="files"
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: panelHeight + 8, opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={dragHeight !== null ? { duration: 0 } : spring}
+            key={settings.filePanelPosition}
+            initial={right ? { width: 0, opacity: 0 } : { height: 0, opacity: 0 }}
+            animate={right ? { width: panelSize + 8, opacity: 1 } : { height: panelSize + 8, opacity: 1 }}
+            exit={right ? { width: 0, opacity: 0 } : { height: 0, opacity: 0 }}
+            transition={dragSize !== null ? { duration: 0 } : spring}
             className="relative shrink-0 overflow-hidden"
           >
             <div
               onMouseDown={startResize}
-              title="拖动调整高度"
-              className="group absolute inset-x-0 top-0 z-10 flex h-2 cursor-row-resize items-center justify-center"
+              title={right ? '拖动调整宽度' : '拖动调整高度'}
+              className={clsx(
+                'group absolute z-10 flex items-center justify-center',
+                right ? 'inset-y-0 left-0 w-2 cursor-col-resize' : 'inset-x-0 top-0 h-2 cursor-row-resize'
+              )}
             >
-              <div className="h-[3px] w-10 rounded-full bg-fg/10 transition-colors group-hover:bg-accent/70" />
+              <div
+                className={clsx(
+                  'rounded-full bg-fg/10 transition-colors group-hover:bg-accent/70',
+                  right ? 'h-10 w-[3px]' : 'h-[3px] w-10'
+                )}
+              />
             </div>
-            <div className="absolute inset-x-0 top-2 bottom-0">
-              <FilePanel tab={tab} host={session?.host ?? ''} />
+            {/* Fixed-size content anchored to the far edge so it slides in instead of reflowing. */}
+            <div
+              style={right ? { width: panelSize } : { height: panelSize }}
+              className={clsx('absolute', right ? 'inset-y-0 right-0' : 'inset-x-0 bottom-0')}
+            >
+              <FilePanel tab={tab} host={session?.host ?? ''} stacked={right} />
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      <TransferDrawer />
     </motion.div>
   )
 }
