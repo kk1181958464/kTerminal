@@ -68,12 +68,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
+        continue-on-error: true
         with:
           path: dist
           merge-multiple: true
+
+      # Never publish an empty release when every platform failed.
+      - name: Check artifacts
+        run: ls dist/* > /dev/null
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*
+          fail_on_unmatched_files: true
           generate_release_notes: true

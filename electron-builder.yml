@@ -43,8 +43,11 @@ mac:
       arch:
         - arm64
         - x64
-  # No Apple Developer ID: ad-hoc sign so the app still launches on Apple silicon.
+  # No Apple Developer ID: ad-hoc sign so the app still launches on Apple silicon. Hardened runtime
+  # is only needed for notarization, and with an ad-hoc signature it makes library validation
+  # reject Electron's own frameworks and native modules at launch.
   identity: '-'
+  hardenedRuntime: false
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
     - NSDocumentsFolderUsageDescription: kTerminal 需要访问"文稿"文件夹以浏览和传输文件。
