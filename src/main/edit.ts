@@ -8,6 +8,7 @@ import type { EditorInfo } from '../shared/types'
 import { getSftp } from './ssh'
 import { describeFsError, promisify } from './files'
 import { getSettings } from './settings'
+import { findOnPath } from './paths'
 
 interface EditSession {
   tabId: string
@@ -25,6 +26,11 @@ const sessions = new Map<string, EditSession>()
 
 const editorNames: Record<string, string> = {
   code: 'VS Code',
+  'visual studio code': 'VS Code',
+  'sublime text': 'Sublime Text',
+  subl: 'Sublime Text',
+  open: '文本编辑',
+  'xdg-open': '系统默认程序',
   cursor: 'Cursor',
   'notepad++': 'Notepad++',
   notepad: '记事本',
@@ -33,11 +39,23 @@ const editorNames: Record<string, string> = {
 }
 
 function editorName(path: string): string {
-  const base = basename(path).replace(/\.exe$/i, '')
+  const base = basename(path).replace(/\.(exe|app)$/i, '')
   return editorNames[base.toLowerCase()] ?? base
 }
 
 function detectEditor(): string {
+  if (process.platform === 'darwin') {
+    const apps = ['Visual Studio Code', 'Cursor', 'Sublime Text', 'Zed'].map((a) => `/Applications/${a}.app`)
+    return apps.find((p) => existsSync(p)) ?? findOnPath('code') ?? 'open'
+  }
+  if (process.platform !== 'win32') {
+    const bins = ['code', 'cursor', 'subl', 'zed', 'gnome-text-editor', 'gedit', 'kate', 'mousepad', 'xed']
+    for (const bin of bins) {
+      const found = findOnPath(bin)
+      if (found) return found
+    }
+    return 'xdg-open'
+  }
   const local = process.env.LOCALAPPDATA ?? ''
   const candidates = [
     join(local, 'Programs', 'Microsoft VS Code', 'Code.exe'),
@@ -117,13 +135,22 @@ export async function openRemoteFile(wc: WebContents, tabId: string, remotePath:
   }
 
   const editor = resolveEditor()
-  const child = spawn(editor.path, [s.localPath], { detached: true, stdio: 'ignore' })
+  const [command, args] = launchCommand(editor.path, s.localPath)
+  const child = spawn(command, args, { detached: true, stdio: 'ignore' })
   await new Promise<void>((resolve, reject) => {
     child.once('error', reject)
     child.once('spawn', resolve)
   })
   child.unref()
   return editor.name
+}
+
+function launchCommand(editor: string, file: string): [string, string[]] {
+  if (process.platform === 'darwin') {
+    if (editor.endsWith('.app')) return ['open', ['-a', editor, file]]
+    if (editor === 'open') return ['open', ['-t', file]]
+  }
+  return [editor, [file]]
 }
 
 export function releaseTab(tabId: string): void {

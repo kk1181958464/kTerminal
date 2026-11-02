@@ -26,6 +26,7 @@ export function localHome(): string {
 }
 
 function listDrives(): string[] {
+  if (process.platform !== 'win32') return ['/']
   return 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
     .split('')
     .filter((l) => existsSync(`${l}:\\`))
@@ -38,7 +39,7 @@ export async function localPlaces(): Promise<LocalPlaces> {
       const st = await fsp.statfs(path).catch(() => null)
       return {
         path,
-        name: path.slice(0, 2),
+        name: path === '/' ? '/' : path.slice(0, 2),
         free: st ? st.bavail * st.bsize : 0,
         total: st ? st.blocks * st.bsize : 0
       }
@@ -59,7 +60,7 @@ export async function localPlaces(): Promise<LocalPlaces> {
 export async function listLocal(dir: string): Promise<FileEntry[]> {
   if (!dir) {
     return listDrives().map((path) => ({
-      name: path.slice(0, 2),
+      name: path === '/' ? '/' : path.slice(0, 2),
       path,
       isDir: true,
       isLink: false,

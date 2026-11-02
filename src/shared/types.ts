@@ -85,7 +85,8 @@ export interface Api {
   }
   window: {
     /** Recolors the native title bar overlay (min/max/close buttons). */
-    setTheme(background: string, symbol: string, material: 'acrylic' | 'none'): void
+    /** `solid` is the opaque fallback used where native blur is unavailable. */
+    setTheme(background: string, symbol: string, material: 'acrylic' | 'none', solid: string): void
     getCloseToTray(): Promise<boolean>
     setCloseToTray(value: boolean): void
   }

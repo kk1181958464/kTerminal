@@ -63,11 +63,13 @@ function App(): React.JSX.Element {
   useEffect(() => {
     // Capture phase so the shortcut works even while the terminal has focus.
     const onKey = (e: KeyboardEvent): void => {
-      if (e.ctrlKey && !e.shiftKey && !e.altKey && e.key === ',') {
+      // Cmd on macOS, Ctrl elsewhere.
+      const mod = e.ctrlKey || e.metaKey
+      if (mod && !e.shiftKey && !e.altKey && e.key === ',') {
         e.preventDefault()
         e.stopPropagation()
         useSettings.getState().setSettingsOpen(true)
-      } else if (e.ctrlKey && e.shiftKey && !e.altKey && e.code === 'KeyT') {
+      } else if (mod && e.shiftKey && !e.altKey && e.code === 'KeyT') {
         e.preventDefault()
         e.stopPropagation()
         useStore.getState().openLocalTab()

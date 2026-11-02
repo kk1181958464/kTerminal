@@ -3,8 +3,9 @@ import { spawn as ptySpawn, type IPty } from '@lydell/node-pty'
 import { execFileSync } from 'child_process'
 import { existsSync } from 'fs'
 import { homedir } from 'os'
-import { delimiter, dirname, join } from 'path'
+import { dirname, join } from 'path'
 import type { ConnectResult, LocalShell } from '../shared/types'
+import { findOnPath } from './paths'
 
 interface ShellDef extends LocalShell {
   path: string
@@ -13,14 +14,6 @@ interface ShellDef extends LocalShell {
 
 const ptys = new Map<string, IPty>()
 let shells: ShellDef[] | null = null
-
-function findOnPath(exe: string): string | undefined {
-  for (const dir of (process.env.PATH ?? '').split(delimiter)) {
-    const full = join(dir, exe)
-    if (dir && existsSync(full)) return full
-  }
-  return undefined
-}
 
 function detectShells(): ShellDef[] {
   if (process.platform !== 'win32') {

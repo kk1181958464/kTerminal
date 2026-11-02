@@ -60,7 +60,8 @@ interface PaneApi {
 }
 
 function parentOf(kind: Kind, path: string): string | null {
-  if (kind === 'remote') {
+  // Remote paths, and local ones on macOS/Linux, are POSIX.
+  if (kind === 'remote' || path.startsWith('/')) {
     if (path === '/') return null
     const i = path.replace(/\/+$/, '').lastIndexOf('/')
     return i <= 0 ? '/' : path.slice(0, i)
@@ -435,7 +436,7 @@ function FilePane({ kind, tabId, title, api, path, setPath, ready, onSend, onRec
     const folderIcons: Record<string, typeof File> = { 桌面: Laptop, 下载: FileDown, 文档: FileStack, 主目录: Home }
     openMenuAt(el, [
       ...drives.map((d) => ({
-        label: `本地磁盘 (${d.name})`,
+        label: d.path === '/' ? '根目录 /' : `本地磁盘 (${d.name})`,
         icon: HardDrive,
         hint: d.total ? `可用 ${formatSize(d.free)} / ${formatSize(d.total)}` : undefined,
         active: d.name === current,

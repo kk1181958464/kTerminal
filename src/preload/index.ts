@@ -61,8 +61,8 @@ const api: Api = {
     onSynced: (cb) => listen('edit:synced', cb)
   },
   window: {
-    setTheme: (background, symbol, material) =>
-      ipcRenderer.send('window:setTheme', background, symbol, material),
+    setTheme: (background, symbol, material, solid) =>
+      ipcRenderer.send('window:setTheme', background, symbol, material, solid),
     getCloseToTray: () => ipcRenderer.invoke('window:getCloseToTray'),
     setCloseToTray: (value) => ipcRenderer.send('window:setCloseToTray', value)
   },

@@ -4,7 +4,7 @@
 
 <h1 align="center">kTerminal</h1>
 
-<p align="center">SSH 终端与 SFTP 文件传输一体化的桌面工具（Windows）</p>
+<p align="center">SSH 终端与 SFTP 文件传输一体化的桌面工具（Windows / macOS / Linux）</p>
 
 ## 功能
 
@@ -18,7 +18,17 @@
 
 ## 下载
 
-在 [Releases](https://github.com/kk1181958464/kTerminal/releases) 页面下载 `kTerminal-x.y.z-setup.exe` 安装即可。
+在 [Releases](https://github.com/kk1181958464/kTerminal/releases) 页面下载对应平台的安装包：
+
+| 平台 | 文件 |
+| --- | --- |
+| Windows | `kTerminal-x.y.z-setup.exe` |
+| macOS（Apple 芯片） | `kTerminal-x.y.z-arm64.dmg` |
+| macOS（Intel） | `kTerminal-x.y.z-x64.dmg` |
+| Linux | `kTerminal-x.y.z-x86_64.AppImage` 或 `kTerminal-x.y.z-amd64.deb` |
+
+- **macOS**：安装包未经 Apple 公证，首次打开若提示"无法验证开发者"，请在"系统设置 → 隐私与安全性"中点击"仍要打开"，或执行 `xattr -cr /Applications/kTerminal.app`。
+- **Linux**：AppImage 需要先 `chmod +x` 再运行；部分发行版需安装 `libfuse2`。
 
 ## 开发
 
@@ -33,7 +43,7 @@ npm run icons      # 由 build/icon.svg、build/tray.svg 重新生成图标
 
 ## 发布
 
-推送 `v` 开头的 tag 即可触发 GitHub Actions 自动打包并创建 Release，安装包版本号取自 tag：
+推送 `v` 开头的 tag 即可触发 GitHub Actions 同时打包 Windows、macOS、Linux 并创建 Release，安装包版本号取自 tag：
 
 ```bash
 git tag v1.0.1

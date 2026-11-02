@@ -80,7 +80,13 @@ export function TitleBar(): React.JSX.Element {
 
   return (
     // Right padding leaves room for the native window controls (titleBarOverlay).
-    <header className="drag flex h-10 shrink-0 items-center gap-1.5 bg-app pr-[140px] pl-2">
+    <header
+      className={clsx(
+        'drag flex h-10 shrink-0 items-center gap-1.5 bg-app',
+        // Leave room for macOS traffic lights (left) or the Windows/Linux window controls (right).
+        window.electron.process.platform === 'darwin' ? 'pr-2 pl-[78px]' : 'pr-[140px] pl-2'
+      )}
+    >
       <button
         title={collapsed ? '显示侧边栏' : '隐藏侧边栏'}
         onClick={() => setSettings({ sidebarCollapsed: !collapsed })}

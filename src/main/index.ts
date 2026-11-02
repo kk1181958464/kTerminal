@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, dialog, Menu, Tray } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog, Menu, Tray, nativeImage } from 'electron'
 import { cpSync, existsSync } from 'fs'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -34,7 +34,12 @@ function showWindow(): void {
 }
 
 function createTray(): void {
-  tray = new Tray(process.platform === 'win32' ? trayIcon : trayPng)
+  // Windows takes the multi-size .ico; menu bars on macOS/Linux want a small PNG.
+  tray = new Tray(
+    process.platform === 'win32'
+      ? trayIcon
+      : nativeImage.createFromPath(trayPng).resize({ width: process.platform === 'darwin' ? 18 : 22 })
+  )
   tray.setToolTip('kTerminal')
   tray.setContextMenu(
     Menu.buildFromTemplate([
@@ -61,7 +66,10 @@ function createWindow(): void {
     show: false,
     backgroundColor: '#090b10',
     titleBarStyle: 'hidden',
-    titleBarOverlay: { color: '#090b10', symbolColor: '#8790a3', height: 40 },
+    // macOS draws its traffic lights instead of the window-controls overlay.
+    ...(process.platform === 'darwin'
+      ? { trafficLightPosition: { x: 14, y: 13 } }
+      : { titleBarOverlay: { color: '#090b10', symbolColor: '#8790a3', height: 40 } }),
     icon,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -168,7 +176,12 @@ function registerIpc(): void {
     const win = BrowserWindow.fromWebContents(e.sender)!
     const result = await dialog.showOpenDialog(win, {
       title: '选择本地编辑器',
-      filters: [{ name: '程序', extensions: ['exe'] }],
+      filters:
+        process.platform === 'win32'
+          ? [{ name: '程序', extensions: ['exe'] }]
+          : process.platform === 'darwin'
+            ? [{ name: '应用程序', extensions: ['app'] }]
+            : [],
       properties: ['openFile']
     })
     if (result.canceled) return null
@@ -179,15 +192,22 @@ function registerIpc(): void {
     updateSettings({ editorPath: undefined })
     return resolveEditor()
   })
-  ipcMain.on('window:setTheme', (e, background: string, symbol: string, material: 'acrylic' | 'none') => {
-    const win = BrowserWindow.fromWebContents(e.sender)
-    if (!win) return
-    // Acrylic only shows through a fully transparent window background.
-    const glass = material === 'acrylic' && process.platform === 'win32'
-    win.setBackgroundMaterial(glass ? 'acrylic' : 'none')
-    win.setBackgroundColor(glass ? '#00000000' : background)
-    win.setTitleBarOverlay({ color: glass ? '#00000000' : background, symbolColor: symbol, height: 40 })
-  })
+  ipcMain.on(
+    'window:setTheme',
+    (e, background: string, symbol: string, material: 'acrylic' | 'none', solid: string) => {
+      const win = BrowserWindow.fromWebContents(e.sender)
+      if (!win) return
+      const platform = process.platform
+      // Native blur exists on Windows (acrylic) and macOS (vibrancy); it only shows through a fully
+      // transparent window background. Elsewhere glass themes fall back to an opaque base color.
+      const native = material === 'acrylic' && (platform === 'win32' || platform === 'darwin')
+      if (platform === 'win32') win.setBackgroundMaterial(native ? 'acrylic' : 'none')
+      if (platform === 'darwin') win.setVibrancy(native ? 'under-window' : null)
+      const base = native ? '#00000000' : material === 'acrylic' ? solid : background
+      win.setBackgroundColor(base)
+      if (platform !== 'darwin') win.setTitleBarOverlay({ color: base, symbolColor: symbol, height: 40 })
+    }
+  )
   ipcMain.handle('app:version', () => app.getVersion())
   ipcMain.handle('window:getCloseToTray', () => !!getSettings().closeToTray)
   ipcMain.on('window:setCloseToTray', (_e, value: boolean) => updateSettings({ closeToTray: value }))

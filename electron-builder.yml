@@ -31,24 +31,43 @@ nsis:
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
 mac:
+  category: public.app-category.developer-tools
+  target:
+    - target: dmg
+      arch:
+        - arm64
+        - x64
+    - target: zip
+      arch:
+        - arm64
+        - x64
+  # No Apple Developer ID: ad-hoc sign so the app still launches on Apple silicon.
+  identity: '-'
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
-    - NSCameraUsageDescription: Application requests access to the device's camera.
-    - NSMicrophoneUsageDescription: Application requests access to the device's microphone.
-    - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
-    - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
+    - NSDocumentsFolderUsageDescription: kTerminal 需要访问"文稿"文件夹以浏览和传输文件。
+    - NSDownloadsFolderUsageDescription: kTerminal 需要访问"下载"文件夹以浏览和传输文件。
+    - NSDesktopFolderUsageDescription: kTerminal 需要访问"桌面"文件夹以浏览和传输文件。
   notarize: false
 dmg:
-  artifactName: ${name}-${version}.${ext}
+  artifactName: ${productName}-${version}-${arch}.${ext}
+zip:
+  artifactName: ${productName}-${version}-${arch}-mac.${ext}
 linux:
   target:
-    - AppImage
-    - snap
-    - deb
-  maintainer: kk1181958464
-  category: Utility
+    - target: AppImage
+      arch:
+        - x64
+    - target: deb
+      arch:
+        - x64
+  maintainer: kk1181958464 <1181958464@qq.com>
+  category: Development
+  synopsis: SSH 终端与 SFTP 文件传输一体化工具
 appImage:
-  artifactName: ${name}-${version}.${ext}
+  artifactName: ${productName}-${version}-${arch}.${ext}
+deb:
+  artifactName: ${productName}-${version}-${arch}.${ext}
 npmRebuild: false
 publish:
   provider: github

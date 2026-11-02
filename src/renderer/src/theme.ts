@@ -18,6 +18,8 @@ interface ThemeDef {
   material?: 'acrylic'
   /** Window control (min/max/close) glyph color when `dim` is translucent. */
   symbol?: string
+  /** Opaque window color for platforms without native blur (Linux). */
+  solid?: string
   ui: {
     app: string
     term: string
@@ -116,6 +118,7 @@ export const themes: Record<ThemeId, ThemeDef> = {
     dark: true,
     material: 'acrylic',
     symbol: '#c9ccd6',
+    solid: '#14161d',
     ui: {
       app: 'rgba(14, 16, 24, 0.30)', term: 'rgba(10, 12, 18, 0.46)', panel: 'rgba(255, 255, 255, 0.06)',
       card: 'rgba(30, 33, 45, 0.94)', line: 'rgba(255, 255, 255, 0.10)',
@@ -131,6 +134,7 @@ export const themes: Record<ThemeId, ThemeDef> = {
     dark: false,
     material: 'acrylic',
     symbol: '#3a3f4a',
+    solid: '#eef1f6',
     ui: {
       app: 'rgba(246, 248, 252, 0.36)', term: 'rgba(255, 255, 255, 0.50)', panel: 'rgba(0, 0, 0, 0.04)',
       card: 'rgba(255, 255, 255, 0.95)', line: 'rgba(0, 0, 0, 0.09)',
@@ -312,5 +316,5 @@ export function applyTheme(id: ThemeId, accent: string | null, animate: boolean)
   for (const [k, v] of Object.entries(vars)) root.style.setProperty(`--c-${k}`, v)
   root.style.colorScheme = t.dark ? 'dark' : 'light'
   root.dataset.dark = String(t.dark)
-  window.api.window.setTheme(t.ui.app, t.symbol ?? t.ui.dim, t.material ?? 'none')
+  window.api.window.setTheme(t.ui.app, t.symbol ?? t.ui.dim, t.material ?? 'none', t.solid ?? t.ui.app)
 }
