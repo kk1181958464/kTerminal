@@ -26,7 +26,15 @@ const api: Api = {
     onClosed: (cb) => listen('ssh:closed', cb)
   },
   dialog: {
-    openPrivateKey: () => ipcRenderer.invoke('dialog:openPrivateKey')
+    openPrivateKey: () => ipcRenderer.invoke('dialog:openPrivateKey'),
+    openDirectory: (defaultPath) => ipcRenderer.invoke('dialog:openDirectory', defaultPath)
+  },
+  update: {
+    status: () => ipcRenderer.invoke('update:status'),
+    check: () => ipcRenderer.invoke('update:check'),
+    install: () => ipcRenderer.send('update:install'),
+    openReleasePage: () => ipcRenderer.send('update:openReleasePage'),
+    onStatus: (cb) => listen('update:status', cb)
   },
   local: {
     home: () => ipcRenderer.invoke('local:home'),
@@ -74,7 +82,7 @@ const api: Api = {
   },
   pty: {
     shells: () => ipcRenderer.invoke('pty:shells'),
-    spawn: (tabId, shellId, cols, rows) => ipcRenderer.invoke('pty:spawn', tabId, shellId, cols, rows)
+    spawn: (tabId, shellId, cols, rows, cwd) => ipcRenderer.invoke('pty:spawn', tabId, shellId, cols, rows, cwd)
   },
   appVersion: () => ipcRenderer.invoke('app:version'),
   getPathForFile: (file) => webUtils.getPathForFile(file)

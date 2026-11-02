@@ -87,7 +87,7 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
     if (tab.kind === 'local') {
       updateTab(tab.id, { status: 'connecting', error: undefined })
       fit.fit()
-      const res = await window.api.pty.spawn(tab.id, tab.shell?.id ?? '', term.cols, term.rows)
+      const res = await window.api.pty.spawn(tab.id, tab.shell?.id ?? '', term.cols, term.rows, tab.cwd)
       if (res.ok) {
         updateTab(tab.id, { status: 'connected', cols: term.cols, rows: term.rows })
         term.focus()

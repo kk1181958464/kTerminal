@@ -61,6 +61,27 @@ function App(): React.JSX.Element {
   }, [])
 
   useEffect(() => {
+    window.api.update.status().then((update) => useStore.setState({ update }))
+    const off = window.api.update.onStatus((update) => {
+      const prev = useStore.getState().update
+      useStore.setState({ update })
+      if (update.state === prev.state) return
+      if (update.state === 'ready') toast(`新版本 v${update.version} 已下载，重启即可完成更新`, 'success')
+      if (update.state === 'available') toast(`发现新版本 v${update.version}`, 'info')
+    })
+    const autoCheck = (): void => {
+      if (useSettings.getState().autoUpdate) window.api.update.check()
+    }
+    const first = setTimeout(autoCheck, 8000)
+    const timer = setInterval(autoCheck, 6 * 60 * 60 * 1000)
+    return () => {
+      off()
+      clearTimeout(first)
+      clearInterval(timer)
+    }
+  }, [])
+
+  useEffect(() => {
     // Capture phase so the shortcut works even while the terminal has focus.
     const onKey = (e: KeyboardEvent): void => {
       // Cmd on macOS, Ctrl elsewhere.

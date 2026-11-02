@@ -60,6 +60,9 @@ export interface Settings {
   highlight: HighlightSettings
   /** Local shell opened by default; null picks the first detected one. */
   defaultShell: string | null
+  /** Working directory for new local terminals; null means the home directory. */
+  localCwd: string | null
+  autoUpdate: boolean
 }
 
 export const defaultSettings: Settings = {
@@ -80,7 +83,9 @@ export const defaultSettings: Settings = {
   showHiddenFiles: false,
   filePanelPosition: 'right',
   highlight: defaultHighlight,
-  defaultShell: null
+  defaultShell: null,
+  localCwd: null,
+  autoUpdate: true
 }
 
 interface SettingsState extends Settings {

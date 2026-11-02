@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ChevronRight,
   Copy,
+  FolderOpen,
   Monitor,
   Moon,
   MoreHorizontal,
@@ -160,6 +161,7 @@ export function Sidebar(): React.JSX.Element {
 function LocalTerminalEntry(): React.JSX.Element {
   const shells = useStore((s) => s.localShells)
   const openLocalTab = useStore((s) => s.openLocalTab)
+  const openLocalTabIn = useStore((s) => s.openLocalTabIn)
   const defaultShell = useSettings((s) => s.defaultShell)
   const current = shells.find((s) => s.id === defaultShell) ?? shells[0]
 
@@ -178,19 +180,20 @@ function LocalTerminalEntry(): React.JSX.Element {
           <div className="mt-0.5 truncate text-[11px] leading-tight text-dim">{current?.name ?? '检测中…'}</div>
         </div>
       </button>
-      {shells.length > 1 && (
+      {shells.length > 0 && (
         <button
-          title="选择 Shell"
+          title="选择 Shell 或目录"
           onClick={(e) =>
-            openMenuAt(
-              e.currentTarget,
-              shells.map((shell) => ({
+            openMenuAt(e.currentTarget, [
+              ...shells.map((shell) => ({
                 label: shell.name,
                 icon: Monitor,
                 active: shell.id === current?.id,
                 onClick: () => openLocalTab(shell)
-              }))
-            )
+              })),
+              'sep',
+              { label: '在指定目录打开…', icon: FolderOpen, onClick: () => openLocalTabIn() }
+            ])
           }
           className="icon-btn h-7 w-7"
         >

@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { CustomFont, EditorInfo, LocalShell, Session, SessionInput, TransferTask } from '../../shared/types'
+import type { CustomFont, EditorInfo, LocalShell, Session, SessionInput, TransferTask, UpdateStatus } from '../../shared/types'
 import { useSettings } from './settings'
 
 export type TabStatus = 'auth' | 'connecting' | 'connected' | 'closed' | 'error'
@@ -10,6 +10,7 @@ export interface Tab {
   kind: 'ssh' | 'local'
   sessionId: string
   shell?: LocalShell
+  cwd?: string
   title: string
   status: TabStatus
   error?: string
@@ -41,6 +42,7 @@ export interface Toast {
 interface State {
   sessions: Session[]
   localShells: LocalShell[]
+  update: UpdateStatus
   tabs: Tab[]
   activeTabId: string | null
   dialog: { session?: Session } | null
@@ -67,7 +69,9 @@ interface State {
   saveSession(input: SessionInput): Promise<Session>
   deleteSession(id: string): Promise<void>
   openTab(session: Session): void
-  openLocalTab(shell?: LocalShell): void
+  openLocalTab(shell?: LocalShell, cwd?: string): void
+  /** Asks for a directory, then opens a local terminal there. */
+  openLocalTabIn(shell?: LocalShell): Promise<void>
   closeTab(id: string): void
   setActiveTab(id: string): void
   reorderTabs(tabs: Tab[]): void
@@ -98,6 +102,7 @@ export function toSessionInput(s: Session): SessionInput {
 export const useStore = create<State>((set, get) => ({
   sessions: [],
   localShells: [],
+  update: { state: 'idle', canInstall: false },
   tabs: [],
   activeTabId: null,
   dialog: null,
@@ -142,7 +147,11 @@ export const useStore = create<State>((set, get) => ({
     }
     set((s) => ({ tabs: [...s.tabs, tab], activeTabId: tab.id }))
   },
-  openLocalTab(shell) {
+  async openLocalTabIn(shell) {
+    const dir = await window.api.dialog.openDirectory(useSettings.getState().localCwd ?? undefined)
+    if (dir) get().openLocalTab(shell, dir)
+  },
+  openLocalTab(shell, cwd) {
     const shells = get().localShells
     const chosen = shell ?? shells.find((s) => s.id === useSettings.getState().defaultShell) ?? shells[0]
     if (!chosen) return toast('未检测到可用的本地 Shell', 'error')
@@ -152,6 +161,7 @@ export const useStore = create<State>((set, get) => ({
       kind: 'local',
       sessionId: '',
       shell: chosen,
+      cwd: cwd ?? useSettings.getState().localCwd ?? undefined,
       title: same ? `${chosen.name} (${same + 1})` : chosen.name,
       status: 'connecting',
       filesOpen: false

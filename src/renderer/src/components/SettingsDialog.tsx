@@ -14,6 +14,7 @@ import {
   Info,
   Minus,
   Monitor,
+  FolderOpen,
   Palette,
   PanelBottom,
   Pipette,
@@ -988,10 +989,60 @@ function ColorSlotPicker({
   )
 }
 
+const updateText: Record<string, string> = {
+  idle: '尚未检查',
+  checking: '正在检查…',
+  latest: '已是最新版本',
+  available: '发现新版本',
+  downloading: '正在下载更新',
+  ready: '更新已下载，重启后生效',
+  error: '检查失败'
+}
+
+function UpdateGroup(): React.JSX.Element {
+  const update = useStore((st) => st.update)
+  const autoUpdate = useSettings((st) => st.autoUpdate)
+  const set = useSettings((st) => st.set)
+  const busy = update.state === 'checking' || update.state === 'downloading'
+  let desc = updateText[update.state]
+  if (update.version && update.state !== 'latest') desc += ` v${update.version}`
+  if (update.state === 'downloading') desc += ` · ${Math.floor(update.percent ?? 0)}%`
+  if (update.state === 'error') desc += `：${update.error}`
+  if (update.state === 'available' && !update.canInstall) desc += '（当前平台需手动下载安装）'
+
+  return (
+    <Group title="更新">
+      <Row title="检查更新" desc={desc}>
+        {update.state === 'ready' ? (
+          <button onClick={() => window.api.update.install()} className="btn btn-primary h-8 px-3 text-xs">
+            重启并更新
+          </button>
+        ) : update.state === 'available' ? (
+          <button onClick={() => window.api.update.openReleasePage()} className="btn btn-primary h-8 px-3 text-xs">
+            前往下载
+          </button>
+        ) : (
+          <button disabled={busy} onClick={() => window.api.update.check()} className="btn btn-ghost h-8 px-3 text-xs">
+            <RotateCcw size={13} className={clsx(busy && 'animate-spin')} />
+            检查更新
+          </button>
+        )}
+      </Row>
+      <Row title="自动检查更新" desc="启动时及之后每 6 小时检查一次；Windows 与 Linux AppImage 会在后台下载">
+        <Switch checked={autoUpdate} onChange={(v) => set({ autoUpdate: v })} />
+      </Row>
+    </Group>
+  )
+}
+
 function DefaultShellRow(): React.JSX.Element {
   const s = useSettings()
   const shells = useStore((st) => st.localShells)
   const current = shells.find((x) => x.id === s.defaultShell) ?? shells[0]
+  const pickCwd = async (): Promise<void> => {
+    const dir = await window.api.dialog.openDirectory(s.localCwd ?? undefined)
+    if (dir) s.set({ localCwd: dir })
+  }
   return (
     <Group title="本地终端">
       <Row title="默认 Shell" desc="点击侧边栏「本地终端」或按 Ctrl+Shift+T 时打开">
@@ -1006,6 +1057,20 @@ function DefaultShellRow(): React.JSX.Element {
             </option>
           ))}
         </select>
+      </Row>
+      <Row title="默认打开目录" desc={s.localCwd ?? '用户主目录'}>
+        <div className="flex gap-2">
+          {s.localCwd && (
+            <button onClick={() => s.set({ localCwd: null })} className="btn btn-ghost h-8 px-3 text-xs">
+              <RotateCcw size={13} />
+              主目录
+            </button>
+          )}
+          <button onClick={pickCwd} className="btn btn-ghost h-8 px-3 text-xs">
+            <FolderOpen size={13} />
+            选择…
+          </button>
+        </div>
       </Row>
     </Group>
   )
@@ -1151,6 +1216,7 @@ function AboutSection(): React.JSX.Element {
           <div className="mt-0.5 text-xs text-dim">版本 {version} · SSH 终端与 SFTP 文件传输</div>
         </div>
       </div>
+      <UpdateGroup />
       <Group title="运行环境">
         {([
           ['Electron', versions.electron],

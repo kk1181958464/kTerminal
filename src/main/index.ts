@@ -13,6 +13,7 @@ import { openRemoteFile, releaseAll, releaseTab, resolveEditor } from './edit'
 import { getSettings, updateSettings } from './settings'
 import { importFonts, listFonts, readFont, removeFont } from './fonts'
 import { closeAllLocal, closeLocal, listShells, resizeLocal, spawnLocal, writeLocal } from './pty'
+import { checkForUpdates, getUpdateStatus, initUpdater, installUpdate, openReleasePage } from './updater'
 
 // Pin the data dir to "kTerminal" and carry over data from the pre-rename "XSSH" dir.
 if (!app.commandLine.hasSwitch('user-data-dir')) {
@@ -124,9 +125,22 @@ function registerIpc(): void {
   )
   ipcMain.on('ssh:close', (_e, tabId: string) => closeLocal(tabId) || closeShell(tabId))
   ipcMain.handle('pty:shells', () => listShells())
-  ipcMain.handle('pty:spawn', (e, tabId: string, shellId: string, cols: number, rows: number) =>
-    spawnLocal(e.sender, tabId, shellId, cols, rows)
+  ipcMain.handle('pty:spawn', (e, tabId: string, shellId: string, cols: number, rows: number, cwd?: string) =>
+    spawnLocal(e.sender, tabId, shellId, cols, rows, cwd)
   )
+  ipcMain.handle('update:status', () => getUpdateStatus())
+  ipcMain.handle('update:check', () => checkForUpdates())
+  ipcMain.on('update:install', () => installUpdate())
+  ipcMain.on('update:openReleasePage', () => openReleasePage())
+  ipcMain.handle('dialog:openDirectory', async (e, defaultPath?: string) => {
+    const win = BrowserWindow.fromWebContents(e.sender)!
+    const result = await dialog.showOpenDialog(win, {
+      title: '选择目录',
+      defaultPath: defaultPath || app.getPath('home'),
+      properties: ['openDirectory']
+    })
+    return result.canceled ? null : result.filePaths[0]
+  })
 
   // Errors are rethrown with a readable message; Electron prefixes it, the renderer strips that.
   const handle = <A extends unknown[]>(
@@ -248,6 +262,7 @@ app.whenReady().then(() => {
   })
 
   registerIpc()
+  initUpdater()
   createWindow()
   createTray()
 

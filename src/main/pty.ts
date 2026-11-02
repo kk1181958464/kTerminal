@@ -1,7 +1,7 @@
 import type { WebContents } from 'electron'
 import { spawn as ptySpawn, type IPty } from '@lydell/node-pty'
 import { execFileSync } from 'child_process'
-import { existsSync } from 'fs'
+import { existsSync, statSync } from 'fs'
 import { homedir } from 'os'
 import { dirname, join } from 'path'
 import type { ConnectResult, LocalShell } from '../shared/types'
@@ -62,11 +62,26 @@ export function listShells(): LocalShell[] {
   return shells.map(({ id, name }) => ({ id, name }))
 }
 
+function isDirectory(path: string): boolean {
+  try {
+    return statSync(path).isDirectory()
+  } catch {
+    return false
+  }
+}
+
 function send(wc: WebContents, channel: string, ...args: unknown[]): void {
   if (!wc.isDestroyed()) wc.send(channel, ...args)
 }
 
-export function spawnLocal(wc: WebContents, tabId: string, shellId: string, cols: number, rows: number): ConnectResult {
+export function spawnLocal(
+  wc: WebContents,
+  tabId: string,
+  shellId: string,
+  cols: number,
+  rows: number,
+  cwd?: string
+): ConnectResult {
   closeLocal(tabId)
   shells ??= detectShells()
   const shell = shells.find((s) => s.id === shellId) ?? shells[0]
@@ -75,7 +90,7 @@ export function spawnLocal(wc: WebContents, tabId: string, shellId: string, cols
       name: 'xterm-256color',
       cols,
       rows,
-      cwd: homedir(),
+      cwd: cwd && isDirectory(cwd) ? cwd : homedir(),
       env: process.env as Record<string, string>
     })
     ptys.set(tabId, p)

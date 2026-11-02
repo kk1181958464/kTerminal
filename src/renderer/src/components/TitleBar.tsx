@@ -1,6 +1,6 @@
 import clsx from 'clsx'
 import { Reorder } from 'framer-motion'
-import { Ban, CopyPlus, Monitor, PanelLeft, PanelRightClose, Pencil, Plus, RotateCw, TerminalSquare, Unplug, X, XSquare } from 'lucide-react'
+import { Ban, CopyPlus, FolderOpen, Monitor, PanelLeft, PanelRightClose, Pencil, Plus, RotateCw, TerminalSquare, Unplug, X, XSquare } from 'lucide-react'
 import { openMenu, openMenuAt, useStore, type MenuItem, type Tab } from '../store'
 import { useSettings } from '../settings'
 import { StatusDot } from './StatusDot'
@@ -16,6 +16,7 @@ export function TitleBar(): React.JSX.Element {
   const openDialog = useStore((s) => s.openDialog)
   const localShells = useStore((s) => s.localShells)
   const openLocalTab = useStore((s) => s.openLocalTab)
+  const openLocalTabIn = useStore((s) => s.openLocalTabIn)
   const collapsed = useSettings((s) => s.sidebarCollapsed)
   const setSettings = useSettings((s) => s.set)
 
@@ -26,6 +27,7 @@ export function TitleBar(): React.JSX.Element {
       icon: Monitor,
       onClick: () => openLocalTab(shell)
     }))
+    if (items.length) items.push({ label: '在指定目录打开…', icon: FolderOpen, onClick: () => openLocalTabIn() })
     if (items.length && sessions.length) items.push('sep')
     items.push(
       ...sessions.slice(0, 12).map((s) => ({
@@ -57,7 +59,7 @@ export function TitleBar(): React.JSX.Element {
       label: '复制标签',
       icon: CopyPlus,
       disabled: !local && !session,
-      onClick: () => (local ? openLocalTab(tab.shell) : session && openTab(session))
+      onClick: () => (local ? openLocalTab(tab.shell, tab.cwd) : session && openTab(session))
     })
     if (session) items.push({ label: '编辑会话', icon: Pencil, onClick: () => openDialog(session) })
     items.push('sep')

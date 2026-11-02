@@ -49,6 +49,15 @@ export interface Api {
   }
   dialog: {
     openPrivateKey(): Promise<string | null>
+    openDirectory(defaultPath?: string): Promise<string | null>
+  }
+  update: {
+    status(): Promise<UpdateStatus>
+    check(): Promise<void>
+    /** Quits and installs a downloaded update. */
+    install(): void
+    openReleasePage(): void
+    onStatus(cb: (status: UpdateStatus) => void): () => void
   }
   local: {
     home(): Promise<string>
@@ -100,10 +109,20 @@ export interface Api {
   pty: {
     shells(): Promise<LocalShell[]>
     /** Output, exit and input reuse the `ssh` channels, keyed by tab id. */
-    spawn(tabId: string, shellId: string, cols: number, rows: number): Promise<ConnectResult>
+    /** `cwd` falls back to the home directory when missing or not a directory. */
+    spawn(tabId: string, shellId: string, cols: number, rows: number, cwd?: string): Promise<ConnectResult>
   }
   appVersion(): Promise<string>
   getPathForFile(file: File): string
+}
+
+export interface UpdateStatus {
+  state: 'idle' | 'checking' | 'latest' | 'available' | 'downloading' | 'ready' | 'error'
+  version?: string
+  percent?: number
+  error?: string
+  /** False where the app can't replace itself (macOS without signing, .deb, dev builds). */
+  canInstall: boolean
 }
 
 export interface LocalShell {

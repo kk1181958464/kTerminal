@@ -1,5 +1,5 @@
 import clsx from 'clsx'
-import { ArrowUpDown, FolderOpen, Palette } from 'lucide-react'
+import { ArrowUpDown, Download, FolderOpen, Palette, RefreshCw } from 'lucide-react'
 import { useStore } from '../store'
 import { useSettings } from '../settings'
 import { themeLabel } from '../theme'
@@ -31,7 +31,10 @@ export function StatusBar(): React.JSX.Element {
             {statusMeta[tab.status].label}
           </span>
           {tab.kind === 'local' ? (
-            <span className="px-1.5">本地 · {tab.shell?.name}</span>
+            <span className="max-w-[420px] truncate px-1.5" title={tab.cwd}>
+              本地 · {tab.shell?.name}
+              {tab.cwd && ` · ${tab.cwd}`}
+            </span>
           ) : (
             session && (
               <span className="px-1.5 font-mono">
@@ -49,7 +52,9 @@ export function StatusBar(): React.JSX.Element {
         <span className="px-1.5">就绪 · {sessionCount} 个会话</span>
       )}
 
-      <span className="ml-auto px-1.5">UTF-8</span>
+      <span className="ml-auto" />
+      <UpdateIndicator />
+      <span className="px-1.5">UTF-8</span>
       <BarButton
         title="切换主题"
         onClick={() => setSettingsOpen(true)}
@@ -88,6 +93,38 @@ export function StatusBar(): React.JSX.Element {
       )}
     </footer>
   )
+}
+
+function UpdateIndicator(): React.JSX.Element | null {
+  const update = useStore((s) => s.update)
+  if (update.state === 'downloading')
+    return (
+      <span className="flex items-center gap-1.5 px-1.5 tabular-nums" title={`正在下载 v${update.version}`}>
+        <Download size={12} className="text-accent" />
+        下载更新 {Math.floor(update.percent ?? 0)}%
+      </span>
+    )
+  if (update.state === 'ready')
+    return (
+      <BarButton
+        active
+        title="重启应用以完成更新"
+        onClick={() => window.api.update.install()}
+        icon={<RefreshCw size={12} />}
+        label={`重启以更新 v${update.version}`}
+      />
+    )
+  if (update.state === 'available')
+    return (
+      <BarButton
+        active
+        title="前往下载页面"
+        onClick={() => window.api.update.openReleasePage()}
+        icon={<Download size={12} />}
+        label={`新版本 v${update.version}`}
+      />
+    )
+  return null
 }
 
 function BarButton({
