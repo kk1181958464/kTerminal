@@ -316,9 +316,18 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
       window.api.ssh.resize(tab.id, cols, rows)
       updateTab(tab.id, { cols, rows })
     })
-    const offData = window.api.ssh.onData(
-      (id, data) => id === tab.id && term.write(highlighter.process(predictor ? predictor.onOutput(data) : data))
-    )
+    const offData = window.api.ssh.onData((id, data) => {
+      if (id !== tab.id) return
+      if (!predictor) return term.write(highlighter.process(data))
+      // Swallowed segments were already drawn by a prediction; the highlighter still sees them so its
+      // command-line tracking stays in step with the server.
+      let out = ''
+      for (const seg of predictor.onOutput(data)) {
+        const colored = highlighter.process(seg.text)
+        if (!seg.swallow) out += colored
+      }
+      if (out) term.write(out)
+    })
     const offClosed = window.api.ssh.onClosed((id, reason) => {
       if (id !== tab.id) return
       term.write(`\r\n\x1b[2m—— ${tab.kind === 'local' ? '进程已退出' : '连接已断开'} ——\x1b[0m\r\n`)
