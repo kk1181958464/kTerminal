@@ -14,6 +14,7 @@ import { getSettings, updateSettings } from './settings'
 import { importFonts, listFonts, readFont, removeFont } from './fonts'
 import { closeAllLocal, closeLocal, listShells, resizeLocal, spawnLocal, writeLocal } from './pty'
 import { checkForUpdates, getUpdateStatus, initUpdater, installUpdate, openReleasePage } from './updater'
+import { exportConfig, importConfig } from './config'
 import { cleanupPasteDir, clipboardHasImageOnly, stageClipboardImage, stageDroppedFiles } from './clipboard'
 
 // Pin the data dir to "kTerminal" and carry over data from the pre-rename "XSSH" dir.
@@ -130,6 +131,16 @@ function registerIpc(): void {
     spawnLocal(e.sender, tabId, shellId, cols, rows, cwd)
   )
   ipcMain.handle('clipboard:hasImageOnly', () => clipboardHasImageOnly())
+  ipcMain.handle('config:export', (e, settings: Record<string, unknown>) =>
+    exportConfig(BrowserWindow.fromWebContents(e.sender)!, settings)
+  )
+  ipcMain.handle('config:import', async (e) => {
+    try {
+      return await importConfig(BrowserWindow.fromWebContents(e.sender)!)
+    } catch (err) {
+      throw new Error((err as Error).message)
+    }
+  })
   ipcMain.handle('update:status', () => getUpdateStatus())
   ipcMain.handle('update:check', () => checkForUpdates())
   ipcMain.on('update:install', () => installUpdate())

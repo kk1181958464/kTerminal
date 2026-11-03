@@ -26,6 +26,7 @@ import { EchoPredictor } from '../predict'
 import { FilePanel } from './FilePanel'
 
 const spring = { type: 'spring', stiffness: 380, damping: 38 } as const
+const PANEL_MIN = { right: 300, bottom: 180 }
 
 export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -60,19 +61,24 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
     const root = rootRef.current!
     // Always leave the terminal a usable area.
     const max = right ? root.clientWidth - 380 : root.clientHeight - 160
-    const min = right ? 300 : 180
+    const min = right ? PANEL_MIN.right : PANEL_MIN.bottom
+    // Dragging well past the minimum collapses the panel entirely.
+    const collapseAt = min * 0.55
     let latest = startSize
     const onMove = (ev: MouseEvent): void => {
       const delta = start - (right ? ev.clientX : ev.clientY)
-      latest = Math.round(Math.max(min, Math.min(max, startSize + delta)))
+      latest = Math.round(Math.max(0, Math.min(max, startSize + delta)))
       setDragSize(latest)
     }
     const onUp = (): void => {
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseup', onUp)
       document.body.style.cursor = ''
-      if (right) setFilePanelWidth(latest)
-      else setFilePanelHeight(latest)
+      if (latest < collapseAt) {
+        // Keep the last real size so reopening restores it.
+        updateTab(tab.id, { filesOpen: false })
+      } else if (right) setFilePanelWidth(Math.max(min, latest))
+      else setFilePanelHeight(Math.max(min, latest))
       setDragSize(null)
     }
     document.body.style.cursor = right ? 'col-resize' : 'row-resize'
@@ -215,7 +221,7 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
       }
     }
 
-    // Ctrl+Shift+C / Ctrl+Shift+V copy & paste; plain Ctrl+C still sends SIGINT. Plain Ctrl+V pastes too
+    // Ctrl+Shift+C / Ctrl+Shift+V copy & paste. Plain Ctrl+V pastes too
     // (Windows/Linux have no app menu supplying it). preventDefault stops the browser's own paste
     // event, which xterm would handle as a second paste.
     const mac = window.electron.process.platform === 'darwin'
@@ -224,6 +230,13 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
       if (e.shiftKey && e.code === 'KeyC') {
         e.preventDefault()
         copy()
+        return false
+      }
+      // Plain Ctrl+C copies when text is selected (like Windows Terminal); otherwise it's SIGINT.
+      if (!e.shiftKey && e.code === 'KeyC' && !mac && term.hasSelection()) {
+        e.preventDefault()
+        copy()
+        term.clearSelection()
         return false
       }
       if (e.code === 'KeyV' && (e.shiftKey || !mac)) {
@@ -529,7 +542,12 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
             </div>
             {/* Fixed-size content anchored to the far edge so it slides in instead of reflowing. */}
             <div
-              style={right ? { width: panelSize } : { height: panelSize }}
+              // Content keeps its minimum size while being dragged shut, so it slides out instead of squashing.
+              style={
+                right
+                  ? { width: Math.max(PANEL_MIN.right, panelSize) }
+                  : { height: Math.max(PANEL_MIN.bottom, panelSize) }
+              }
               className={clsx('absolute', right ? 'inset-y-0 right-0' : 'inset-x-0 bottom-0')}
             >
               <FilePanel tab={tab} host={session?.host ?? ''} stacked={right} />
@@ -537,6 +555,21 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
           </motion.div>
         )}
       </AnimatePresence>
+
+      {tab.kind === 'ssh' && !tab.filesOpen && (
+        <button
+          title="显示文件面板"
+          onClick={() => updateTab(tab.id, { filesOpen: true })}
+          className={clsx(
+            'group absolute z-10 flex cursor-pointer items-center justify-center bg-fg/[0.07] opacity-70 transition-all hover:bg-accent/20 hover:opacity-100',
+            right
+              ? 'top-1/2 right-0 h-16 w-1.5 -translate-y-1/2 rounded-l-md hover:w-6'
+              : 'bottom-0 left-1/2 h-1.5 w-16 -translate-x-1/2 rounded-t-md hover:h-6'
+          )}
+        >
+          <FolderOpen size={13} className="text-accent opacity-0 transition-opacity group-hover:opacity-100" />
+        </button>
+      )}
 
     </motion.div>
   )

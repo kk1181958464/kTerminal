@@ -118,8 +118,19 @@ export interface Api {
     stageClipboardImage(tabId: string): Promise<string | null>
     stageFiles(tabId: string, paths: string[]): Promise<string[]>
   }
+  config: {
+    /** Resolves with the saved file path, or null if cancelled. */
+    export(settings: Record<string, unknown>): Promise<string | null>
+    import(): Promise<ConfigImportResult | null>
+  }
   appVersion(): Promise<string>
   getPathForFile(file: File): string
+}
+
+export interface ConfigImportResult {
+  settings: Record<string, unknown>
+  added: number
+  skipped: number
 }
 
 export interface UpdateStatus {

@@ -14,8 +14,10 @@ import {
   Info,
   Minus,
   Monitor,
+  Download,
   FolderOpen,
   Palette,
+  Upload,
   PanelBottom,
   Pipette,
   PanelRight,
@@ -27,8 +29,8 @@ import {
   Underline,
   TextCursor
 } from 'lucide-react'
-import { confirmDialog, toast, useStore } from '../store'
-import { terminalFontFamily, useSettings, type CursorStyle, type FilePanelPosition } from '../settings'
+import { confirmDialog, errorMessage, toast, useStore } from '../store'
+import { applyImportedSettings, exportableSettings, terminalFontFamily, useSettings, type CursorStyle, type FilePanelPosition } from '../settings'
 import {
   accentPresets,
   contrastRatio,
@@ -955,7 +957,7 @@ function ColorSlotPicker({
       <button
         onClick={() => setOpen((v) => !v)}
         title={name(value)}
-        className="flex h-7 w-[86px] cursor-pointer items-center gap-1.5 rounded-md border border-line bg-panel px-2 text-[11.5px] text-dim hover:text-fg"
+        className="flex h-7 w-[98px] shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md border border-line bg-panel px-2 text-[11.5px] text-dim hover:text-fg"
       >
         <span className="h-3.5 w-3.5 rounded-full" style={{ background: palette[value] }} />
         {name(value)}
@@ -988,6 +990,57 @@ function ColorSlotPicker({
         )}
       </AnimatePresence>
     </div>
+  )
+}
+
+function ConfigGroup(): React.JSX.Element {
+  const loadSessions = useStore((st) => st.loadSessions)
+
+  const doExport = async (): Promise<void> => {
+    try {
+      const path = await window.api.config.export(exportableSettings())
+      if (path) toast(`配置已导出到 ${path}`, 'success')
+    } catch (err) {
+      toast(`导出失败：${errorMessage(err)}`, 'error')
+    }
+  }
+
+  const doImport = async (): Promise<void> => {
+    const ok = await confirmDialog({
+      title: '导入配置？',
+      message: '导入文件中的外观、终端等设置会覆盖当前设置；会话会合并，相同的会话自动跳过。',
+      okText: '选择文件'
+    })
+    if (!ok) return
+    try {
+      const result = await window.api.config.import()
+      if (!result) return
+      applyImportedSettings(result.settings)
+      await loadSessions()
+      toast(
+        `已导入：新增 ${result.added} 个会话${result.skipped ? `，跳过 ${result.skipped} 个已存在的会话` : ''}，设置已应用`,
+        'success'
+      )
+    } catch (err) {
+      toast(`导入失败：${errorMessage(err)}`, 'error')
+    }
+  }
+
+  return (
+    <Group title="配置">
+      <Row title="导入 / 导出配置" desc="包含会话、外观、终端、高亮等设置；已保存的密码不会导出（它们只能在本机解密）">
+        <div className="flex gap-2">
+          <button onClick={doImport} className="btn btn-ghost h-8 px-3 text-xs">
+            <Upload size={13} />
+            导入…
+          </button>
+          <button onClick={doExport} className="btn btn-ghost h-8 px-3 text-xs">
+            <Download size={13} />
+            导出…
+          </button>
+        </div>
+      </Row>
+    </Group>
   )
 }
 
@@ -1243,6 +1296,7 @@ function AboutSection(): React.JSX.Element {
         </div>
       </div>
       <UpdateGroup />
+      <ConfigGroup />
       <Group title="运行环境">
         {([
           ['Electron', versions.electron],

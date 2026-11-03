@@ -76,7 +76,10 @@ function parentOf(kind: Kind, path: string): string | null {
 const extIcons: [RegExp, typeof File][] = [
   [/\.(png|jpe?g|gif|webp|svg|bmp|ico)$/i, FileImage],
   [/\.(zip|gz|tgz|tar|rar|7z|xz|bz2|deb|rpm)$/i, FileArchive],
-  [/\.(js|ts|tsx|jsx|py|sh|go|rs|java|c|cpp|h|json|ya?ml|toml|xml|html|css|conf|ini|sql|php|rb)$/i, FileCode2],
+  [
+    /\.(js|ts|tsx|jsx|py|sh|go|rs|java|c|cpp|h|json|ya?ml|toml|xml|html|css|conf|ini|sql|php|rb)$/i,
+    FileCode2
+  ],
   [/\.(txt|md|log|csv)$/i, FileText]
 ]
 
@@ -124,11 +127,16 @@ export function FilePanel({
         .catch((e) => toast(`无法打开 SFTP：${errorMessage(e)}`, 'error'))
   }, [connected, remotePath, tab.id])
 
-  const transfer = (direction: TransferDirection, sources: string[], targetDir: string | null): void => {
+  const transfer = (
+    direction: TransferDirection,
+    sources: string[],
+    targetDir: string | null
+  ): void => {
     if (!sources.length) return
     if (!connected) return toast('会话未连接', 'error')
     if (targetDir === null) return
-    if (direction === 'download' && !targetDir) return toast('请先在本地面板打开一个文件夹', 'error')
+    if (direction === 'download' && !targetDir)
+      return toast('请先在本地面板打开一个文件夹', 'error')
     window.api.transfer.start({ tabId: tab.id, direction, sources, targetDir })
   }
 
@@ -174,30 +182,30 @@ export function FilePanel({
   }
 
   const localPane = (
-      <FilePane
-        kind="local"
-        tabId={tab.id}
-        title="本地"
-        api={localApi}
-        path={localPath}
-        setPath={setLocalPath}
-        ready
-        onSend={(paths) => transfer('upload', paths, remotePath)}
-        onReceive={(paths, dir) => transfer('download', paths, dir)}
-      />
+    <FilePane
+      kind="local"
+      tabId={tab.id}
+      title="本地"
+      api={localApi}
+      path={localPath}
+      setPath={setLocalPath}
+      ready
+      onSend={(paths) => transfer('upload', paths, remotePath)}
+      onReceive={(paths, dir) => transfer('download', paths, dir)}
+    />
   )
   const remotePane = (
-      <FilePane
-        kind="remote"
-        tabId={tab.id}
-        title={host}
-        api={remoteApi}
-        path={remotePath}
-        setPath={setRemotePath}
-        ready={connected}
-        onSend={(paths) => transfer('download', paths, localPath)}
-        onReceive={(paths, dir) => transfer('upload', paths, dir)}
-      />
+    <FilePane
+      kind="remote"
+      tabId={tab.id}
+      title={host}
+      api={remoteApi}
+      path={remotePath}
+      setPath={setRemotePath}
+      ready={connected}
+      onSend={(paths) => transfer('download', paths, localPath)}
+      onReceive={(paths, dir) => transfer('upload', paths, dir)}
+    />
   )
 
   if (!stacked)
@@ -235,10 +243,15 @@ export function FilePanel({
       >
         <div className="h-[3px] w-10 rounded-full bg-fg/10 transition-colors group-hover:bg-accent/70" />
       </div>
-      <div style={remoteCollapsed ? { display: 'none' } : undefined} className="flex min-h-0 flex-1">
+      <div
+        style={remoteCollapsed ? { display: 'none' } : undefined}
+        className="flex min-h-0 flex-1"
+      >
         {remotePane}
       </div>
-      {remoteCollapsed && <CollapsedPane kind="remote" title={host} onExpand={() => setRatio(0.5)} />}
+      {remoteCollapsed && (
+        <CollapsedPane kind="remote" title={host} onExpand={() => setRatio(0.5)} />
+      )}
     </div>
   )
 }
@@ -286,7 +299,17 @@ interface PaneProps {
 
 type SortKey = 'name' | 'size' | 'mtime'
 
-function FilePane({ kind, tabId, title, api, path, setPath, ready, onSend, onReceive }: PaneProps): React.JSX.Element {
+function FilePane({
+  kind,
+  tabId,
+  title,
+  api,
+  path,
+  setPath,
+  ready,
+  onSend,
+  onReceive
+}: PaneProps): React.JSX.Element {
   const [entries, setEntries] = useState<FileEntry[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -342,7 +365,8 @@ function FilePane({ kind, tabId, title, api, path, setPath, ready, onSend, onRec
   }, [lastDone])
 
   useEffect(() => {
-    if (isRemote && remoteChanged?.tabId === tabId && remoteChanged.dir === path && path !== null) load(path)
+    if (isRemote && remoteChanged?.tabId === tabId && remoteChanged.dir === path && path !== null)
+      load(path)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [remoteChanged])
 
@@ -383,7 +407,11 @@ function FilePane({ kind, tabId, title, api, path, setPath, ready, onSend, onRec
 
   const remove = async (targets: FileEntry[]): Promise<void> => {
     if (!targets.length || atDrives) return
-    const names = targets.slice(0, 3).map((t) => t.name).join('、') + (targets.length > 3 ? ' 等' : '')
+    const names =
+      targets
+        .slice(0, 3)
+        .map((t) => t.name)
+        .join('、') + (targets.length > 3 ? ' 等' : '')
     const ok = await confirmDialog({
       title: `删除 ${targets.length} 项？`,
       message: `${names}\n${isRemote ? '远程文件删除后无法恢复。' : '文件将被移至回收站。'}`,
@@ -402,7 +430,11 @@ function FilePane({ kind, tabId, title, api, path, setPath, ready, onSend, onRec
 
   const mkdir = async (): Promise<void> => {
     if (path === null || atDrives) return
-    const name = await promptDialog({ title: '新建文件夹', placeholder: '文件夹名称', okText: '创建' })
+    const name = await promptDialog({
+      title: '新建文件夹',
+      placeholder: '文件夹名称',
+      okText: '创建'
+    })
     if (!name) return
     try {
       await api.mkdir(path, name)
@@ -433,7 +465,12 @@ function FilePane({ kind, tabId, title, api, path, setPath, ready, onSend, onRec
   const openPlaces = async (el: HTMLElement): Promise<void> => {
     const { drives, folders } = await window.api.local.places()
     const current = path?.slice(0, 2).toUpperCase()
-    const folderIcons: Record<string, typeof File> = { 桌面: Laptop, 下载: FileDown, 文档: FileStack, 主目录: Home }
+    const folderIcons: Record<string, typeof File> = {
+      桌面: Laptop,
+      下载: FileDown,
+      文档: FileStack,
+      主目录: Home
+    }
     openMenuAt(el, [
       ...drives.map((d) => ({
         label: d.path === '/' ? '根目录 /' : `本地磁盘 (${d.name})`,
@@ -444,7 +481,11 @@ function FilePane({ kind, tabId, title, api, path, setPath, ready, onSend, onRec
       })),
       { label: '此电脑', icon: Monitor, active: atDrives, onClick: () => setPath('') },
       'sep',
-      ...folders.map((f) => ({ label: f.name, icon: folderIcons[f.name], onClick: () => setPath(f.path) }))
+      ...folders.map((f) => ({
+        label: f.name,
+        icon: folderIcons[f.name],
+        onClick: () => setPath(f.path)
+      }))
     ])
   }
 
@@ -492,26 +533,55 @@ function FilePane({ kind, tabId, title, api, path, setPath, ready, onSend, onRec
     }
     const single = targets.length === 1
     const items: (MenuItem | 'sep')[] = []
-    if (single && entry.isDir) items.push({ label: '打开', icon: FolderOpen, onClick: () => setPath(entry.path) })
+    if (single && entry.isDir)
+      items.push({ label: '打开', icon: FolderOpen, onClick: () => setPath(entry.path) })
     if (isRemote && single && !entry.isDir) {
-      items.push({ label: '用本地编辑器打开', icon: FilePen, hint: editor?.name, onClick: () => editRemote(entry) })
+      items.push({
+        label: '用本地编辑器打开',
+        icon: FilePen,
+        hint: editor?.name,
+        onClick: () => editRemote(entry)
+      })
       items.push({ label: '选择编辑器…', icon: Settings2, onClick: chooseEditor })
-      if (editor?.custom) items.push({ label: '恢复自动检测编辑器', icon: RotateCw, onClick: resetEditor })
+      if (editor?.custom)
+        items.push({ label: '恢复自动检测编辑器', icon: RotateCw, onClick: resetEditor })
       items.push('sep')
     }
-    if (!atDrives) items.push({ label: sendLabel, icon: SendIcon, onClick: () => onSend(targets.map((t) => t.path)) })
+    if (!atDrives)
+      items.push({
+        label: sendLabel,
+        icon: SendIcon,
+        onClick: () => onSend(targets.map((t) => t.path))
+      })
     if (!isRemote && single)
       items.push(
         entry.isDir
-          ? { label: '在资源管理器中显示', icon: ExternalLink, onClick: () => window.api.local.showInFolder(entry.path) }
-          : { label: '用默认程序打开', icon: ExternalLink, onClick: () => window.api.local.open(entry.path) }
+          ? {
+              label: '在资源管理器中显示',
+              icon: ExternalLink,
+              onClick: () => window.api.local.showInFolder(entry.path)
+            }
+          : {
+              label: '用默认程序打开',
+              icon: ExternalLink,
+              onClick: () => window.api.local.open(entry.path)
+            }
       )
     items.push('sep')
     if (!atDrives) {
       items.push({ label: '重命名', icon: Pencil, disabled: !single, onClick: () => rename(entry) })
-      items.push({ label: '复制路径', icon: Copy, onClick: () => navigator.clipboard.writeText(targets.map((t) => t.path).join('\n')) })
+      items.push({
+        label: '复制路径',
+        icon: Copy,
+        onClick: () => navigator.clipboard.writeText(targets.map((t) => t.path).join('\n'))
+      })
       items.push('sep')
-      items.push({ label: `删除${targets.length > 1 ? ` ${targets.length} 项` : ''}`, icon: Trash2, danger: true, onClick: () => remove(targets) })
+      items.push({
+        label: `删除${targets.length > 1 ? ` ${targets.length} 项` : ''}`,
+        icon: Trash2,
+        danger: true,
+        onClick: () => remove(targets)
+      })
     }
     openMenu(e, items)
   }
@@ -523,8 +593,17 @@ function FilePane({ kind, tabId, title, api, path, setPath, ready, onSend, onRec
       { label: '新建文件夹', icon: FolderPlus, disabled: atDrives, onClick: mkdir }
     ]
     if (!isRemote && path)
-      items.push({ label: '在资源管理器中打开', icon: ExternalLink, onClick: () => window.api.local.open(path) })
-    if (path) items.push({ label: '复制当前路径', icon: Copy, onClick: () => navigator.clipboard.writeText(path) })
+      items.push({
+        label: '在资源管理器中打开',
+        icon: ExternalLink,
+        onClick: () => window.api.local.open(path)
+      })
+    if (path)
+      items.push({
+        label: '复制当前路径',
+        icon: Copy,
+        onClick: () => navigator.clipboard.writeText(path)
+      })
     openMenu(e, items)
   }
 
@@ -544,7 +623,8 @@ function FilePane({ kind, tabId, title, api, path, setPath, ready, onSend, onRec
   const accepts = (e: React.DragEvent): boolean =>
     ready &&
     !atDrives &&
-    (e.dataTransfer.types.includes(DRAG_MIME(other)) || (isRemote && e.dataTransfer.types.includes('Files')))
+    (e.dataTransfer.types.includes(DRAG_MIME(other)) ||
+      (isRemote && e.dataTransfer.types.includes('Files')))
 
   const onDragOver = (e: React.DragEvent, target: string): void => {
     if (!accepts(e)) return
@@ -575,6 +655,7 @@ function FilePane({ kind, tabId, title, api, path, setPath, ready, onSend, onRec
   }
 
   // Narrow panes (e.g. the right-side column) drop the less important columns.
+  const compact = paneWidth < 520
   const showTime = paneWidth >= 380
   const showPerm = isRemote && paneWidth >= 500
   const gridTemplateColumns = ['minmax(0,1fr)', '72px', showTime && '124px', showPerm && '86px']
@@ -585,11 +666,36 @@ function FilePane({ kind, tabId, title, api, path, setPath, ready, onSend, onRec
   const header = (key: SortKey, label: string, align = ''): React.JSX.Element => (
     <button
       onClick={() => setSort((s) => ({ key, asc: s.key === key ? !s.asc : true }))}
-      className={clsx('cursor-pointer truncate hover:text-fg', align, sort.key === key && 'text-fg')}
+      className={clsx(
+        'cursor-pointer truncate hover:text-fg',
+        align,
+        sort.key === key && 'text-fg'
+      )}
     >
       {label}
       {sort.key === key && (sort.asc ? ' ↑' : ' ↓')}
     </button>
+  )
+
+  const pathField = (
+    <input
+      value={atDrives ? '此电脑' : pathInput}
+      disabled={!ready}
+      onChange={(e) => setPathInput(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key !== 'Enter') return
+        const next = pathInput.trim()
+        if (next === path) refresh()
+        else setPath(next)
+      }}
+      onFocus={(e) => atDrives && (e.target.value = '')}
+      spellCheck={false}
+      title={path ?? undefined}
+      className={clsx(
+        'input h-7 min-w-0 rounded-md px-2 font-mono text-[12px]',
+        compact ? 'w-full' : 'mx-1 flex-1'
+      )}
+    />
   )
 
   return (
@@ -600,69 +706,80 @@ function FilePane({ kind, tabId, title, api, path, setPath, ready, onSend, onRec
       data-pane={kind}
       className="surface flex min-w-0 flex-1 flex-col overflow-hidden outline-none"
     >
-      <div className="flex h-9 shrink-0 items-center gap-0.5 border-b border-line px-2">
-        {isRemote ? (
-          <span className="mr-1.5 flex max-w-[140px] shrink-0 items-center gap-1.5 rounded-md bg-fg/[0.05] px-2 py-0.5 text-[11px] text-dim">
-            <Server size={11} />
-            <span className="truncate">{title}</span>
-          </span>
-        ) : (
+      <div className="shrink-0 border-b border-line">
+        <div className="flex h-9 items-center gap-0.5 px-2">
+          {isRemote ? (
+            <span className="mr-1.5 flex max-w-[140px] shrink-0 items-center gap-1.5 rounded-md bg-fg/[0.05] px-2 py-0.5 text-[11px] text-dim">
+              <Server size={11} />
+              <span className="truncate">{title}</span>
+            </span>
+          ) : (
+            <button
+              title="切换磁盘或常用位置"
+              onClick={(e) => openPlaces(e.currentTarget)}
+              className="mr-1.5 flex h-6 shrink-0 cursor-pointer items-center gap-1.5 rounded-md bg-fg/[0.05] px-2 text-[11px] text-dim transition hover:bg-fg/[0.1] hover:text-fg"
+            >
+              {atDrives ? <Monitor size={11} /> : <HardDrive size={11} />}
+              {atDrives ? '此电脑' : (path?.match(/^[a-z]:/i)?.[0].toUpperCase() ?? title)}
+              <ChevronDown size={11} />
+            </button>
+          )}
           <button
-            title="切换磁盘或常用位置"
-            onClick={(e) => openPlaces(e.currentTarget)}
-            className="mr-1.5 flex h-6 shrink-0 cursor-pointer items-center gap-1.5 rounded-md bg-fg/[0.05] px-2 text-[11px] text-dim transition hover:bg-fg/[0.1] hover:text-fg"
+            title="上级目录 (Backspace)"
+            disabled={parent === null || !ready}
+            onClick={() => parent !== null && setPath(parent)}
+            className="icon-btn disabled:opacity-30"
           >
-            {atDrives ? <Monitor size={11} /> : <HardDrive size={11} />}
-            {atDrives ? '此电脑' : (path?.match(/^[a-z]:/i)?.[0].toUpperCase() ?? title)}
-            <ChevronDown size={11} />
+            <ArrowUp size={14} />
           </button>
-        )}
-        <button title="上级目录 (Backspace)" disabled={parent === null || !ready} onClick={() => parent !== null && setPath(parent)} className="icon-btn disabled:opacity-30">
-          <ArrowUp size={14} />
-        </button>
-        <button title="刷新 (F5)" disabled={!ready} onClick={refresh} className="icon-btn disabled:opacity-30">
-          <RotateCw size={13} className={clsx(loading && 'animate-spin')} />
-        </button>
-        <button
-          title="主目录"
-          disabled={!ready}
-          onClick={() => api.home().then(setPath).catch((e) => toast(errorMessage(e), 'error'))}
-          className="icon-btn disabled:opacity-30"
-        >
-          <Home size={13} />
-        </button>
-        <input
-          value={atDrives ? '此电脑' : pathInput}
-          disabled={!ready}
-          onChange={(e) => setPathInput(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key !== 'Enter') return
-            const next = pathInput.trim()
-            if (next === path) refresh()
-            else setPath(next)
-          }}
-          onFocus={(e) => atDrives && (e.target.value = '')}
-          spellCheck={false}
-          className="input mx-1 h-7 min-w-0 flex-1 rounded-md px-2 font-mono text-[12px]"
-        />
-        <button title="新建文件夹" disabled={!ready || atDrives} onClick={mkdir} className="icon-btn disabled:opacity-30">
-          <FolderPlus size={14} />
-        </button>
-        <button
-          title={showHidden ? '隐藏隐藏文件' : '显示隐藏文件'}
-          onClick={() => setShowHidden((v) => !v)}
-          className={clsx('icon-btn', showHidden && 'text-accent')}
-        >
-          {showHidden ? <Eye size={14} /> : <EyeOff size={14} />}
-        </button>
-        <button
-          title={sendLabel}
-          disabled={!selection.length || atDrives}
-          onClick={() => onSend(selection.map((s) => s.path))}
-          className="icon-btn text-accent disabled:opacity-30"
-        >
-          <SendIcon size={14} />
-        </button>
+          <button
+            title="刷新 (F5)"
+            disabled={!ready}
+            onClick={refresh}
+            className="icon-btn disabled:opacity-30"
+          >
+            <RotateCw size={13} className={clsx(loading && 'animate-spin')} />
+          </button>
+          <button
+            title="主目录"
+            disabled={!ready}
+            onClick={() =>
+              api
+                .home()
+                .then(setPath)
+                .catch((e) => toast(errorMessage(e), 'error'))
+            }
+            className="icon-btn disabled:opacity-30"
+          >
+            <Home size={13} />
+          </button>
+          {compact ? <span className="flex-1" /> : pathField}
+          <button
+            title="新建文件夹"
+            disabled={!ready || atDrives}
+            onClick={mkdir}
+            className="icon-btn disabled:opacity-30"
+          >
+            <FolderPlus size={14} />
+          </button>
+          <button
+            title={showHidden ? '隐藏隐藏文件' : '显示隐藏文件'}
+            onClick={() => setShowHidden((v) => !v)}
+            className={clsx('icon-btn', showHidden && 'text-accent')}
+          >
+            {showHidden ? <Eye size={14} /> : <EyeOff size={14} />}
+          </button>
+          <button
+            title={sendLabel}
+            disabled={!selection.length || atDrives}
+            onClick={() => onSend(selection.map((s) => s.path))}
+            className="icon-btn text-accent disabled:opacity-30"
+          >
+            <SendIcon size={14} />
+          </button>
+        </div>
+        {/* Narrow panes (the right-side column) give the path its own full-width row. */}
+        {compact && <div className="px-2 pb-2">{pathField}</div>}
       </div>
 
       <div
@@ -679,11 +796,15 @@ function FilePane({ kind, tabId, title, api, path, setPath, ready, onSend, onRec
         onContextMenu={(e) => ready && blankMenu(e)}
         onMouseDown={(e) => e.target === e.currentTarget && setSelected(new Set())}
         onDragOver={(e) => path !== null && onDragOver(e, path)}
-        onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && setDropTarget(null)}
+        onDragLeave={(e) =>
+          !e.currentTarget.contains(e.relatedTarget as Node) && setDropTarget(null)
+        }
         onDrop={(e) => path !== null && onDrop(e, path)}
         className={clsx(
           'relative min-h-0 flex-1 overflow-y-auto py-1 transition-shadow',
-          dropTarget === path && path !== null && 'bg-accent/[0.05] shadow-[inset_0_0_0_2px_var(--c-accent)]'
+          dropTarget === path &&
+            path !== null &&
+            'bg-accent/[0.05] shadow-[inset_0_0_0_2px_var(--c-accent)]'
         )}
       >
         {!ready ? (
@@ -703,7 +824,11 @@ function FilePane({ kind, tabId, title, api, path, setPath, ready, onSend, onRec
               }}
               onDoubleClick={() => open(entry)}
               onContextMenu={(e) => rowMenu(e, entry)}
-              title={showTime ? undefined : `${entry.name}\n${formatTime(entry.mtime)}${entry.permissions ? `  ${entry.permissions}` : ''}`}
+              title={
+                showTime
+                  ? undefined
+                  : `${entry.name}\n${formatTime(entry.mtime)}${entry.permissions ? `  ${entry.permissions}` : ''}`
+              }
               style={{ gridTemplateColumns }}
               className={clsx(
                 'mx-1 grid h-7 cursor-default items-center gap-3 rounded-md px-2 text-[12.5px] transition-colors duration-100',
@@ -716,18 +841,29 @@ function FilePane({ kind, tabId, title, api, path, setPath, ready, onSend, onRec
             >
               <span className="flex min-w-0 items-center gap-2">
                 <EntryIcon entry={entry} kind={kind} />
-                <span className={clsx('truncate', entry.name.startsWith('.') && 'opacity-60')}>{entry.name}</span>
+                <span className={clsx('truncate', entry.name.startsWith('.') && 'opacity-60')}>
+                  {entry.name}
+                </span>
               </span>
               <span className="text-right text-[11.5px] text-dim tabular-nums">
                 {entry.isDir ? '' : formatSize(entry.size)}
               </span>
-              {showTime && <span className="truncate text-[11.5px] text-dim tabular-nums">{formatTime(entry.mtime)}</span>}
-              {showPerm && <span className="font-mono text-[11px] text-dim/80">{entry.permissions}</span>}
+              {showTime && (
+                <span className="truncate text-[11.5px] text-dim tabular-nums">
+                  {formatTime(entry.mtime)}
+                </span>
+              )}
+              {showPerm && (
+                <span className="font-mono text-[11px] text-dim/80">{entry.permissions}</span>
+              )}
             </div>
           ))
         )}
         {ready && !error && !loading && visible.length === 0 && path !== null && (
-          <Placeholder icon={Folder} text={isRemote ? '空文件夹，可将本地文件拖到这里上传' : '空文件夹'} />
+          <Placeholder
+            icon={Folder}
+            text={isRemote ? '空文件夹，可将本地文件拖到这里上传' : '空文件夹'}
+          />
         )}
       </div>
 

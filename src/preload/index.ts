@@ -89,6 +89,10 @@ const api: Api = {
     stageClipboardImage: (tabId) => ipcRenderer.invoke('clipboard:stageImage', tabId),
     stageFiles: (tabId, paths) => ipcRenderer.invoke('term:stageFiles', tabId, paths)
   },
+  config: {
+    export: (settings) => ipcRenderer.invoke('config:export', settings),
+    import: () => ipcRenderer.invoke('config:import')
+  },
   appVersion: () => ipcRenderer.invoke('app:version'),
   getPathForFile: (file) => webUtils.getPathForFile(file)
 }

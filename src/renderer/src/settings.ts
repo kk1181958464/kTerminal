@@ -115,6 +115,26 @@ export const useSettings = create<SettingsState>()(
   )
 )
 
+/** The persisted preferences, without UI state or actions. */
+export function exportableSettings(): Record<string, unknown> {
+  const state = useSettings.getState()
+  return Object.fromEntries(Object.keys(defaultSettings).map((k) => [k, state[k as keyof Settings]]))
+}
+
+/** Applies imported preferences, keeping only known keys whose type matches the default. */
+export function applyImportedSettings(raw: Record<string, unknown>): number {
+  const patch: Partial<Settings> = {}
+  for (const [key, def] of Object.entries(defaultSettings)) {
+    const value = raw[key]
+    if (value === undefined) continue
+    const sameType = def === null ? value === null || typeof value === 'string' : typeof value === typeof def
+    const sameShape = Array.isArray(def) === Array.isArray(value)
+    if (sameType && sameShape) (patch as Record<string, unknown>)[key] = value
+  }
+  useSettings.getState().set(patch)
+  return Object.keys(patch).length
+}
+
 /** Installed Nerd Fonts supply prompt icons/powerline glyphs (oh-my-posh, starship) the main font lacks. */
 const NERD_FALLBACKS = [
   'Symbols Nerd Font Mono',
