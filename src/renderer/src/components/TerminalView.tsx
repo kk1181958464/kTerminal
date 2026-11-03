@@ -30,6 +30,7 @@ const spring = { type: 'spring', stiffness: 380, damping: 38 } as const
 export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): React.JSX.Element {
   const containerRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<Terminal | null>(null)
+  const webglRef = useRef<WebglAddon | null>(null)
   const fitRef = useRef<FitAddon | null>(null)
   const rootRef = useRef<HTMLDivElement>(null)
   const session = useStore((s) => s.sessions.find((x) => x.id === tab.sessionId))
@@ -103,7 +104,6 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
     }
     updateTab(tab.id, { status: 'connecting', error: undefined })
     fit.fit()
-    term.write(`\x1b[2m正在连接 ${session.username}@${session.host}:${session.port} ...\x1b[0m\r\n`)
     const res = await window.api.ssh.connect(tab.id, session.id, term.cols, term.rows, secret)
     if (res.ok) {
       updateTab(tab.id, { status: 'connected', cols: term.cols, rows: term.rows })
@@ -162,13 +162,7 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
     const highlighter = new Highlighter(() => useSettings.getState().highlight)
     term.open(containerRef.current!)
     const stopClampingIme = clampCompositionView(containerRef.current!)
-    try {
-      const webgl = new WebglAddon()
-      webgl.onContextLoss(() => webgl.dispose())
-      term.loadAddon(webgl)
-    } catch {
-      // Falls back to the DOM renderer.
-    }
+    setWebgl(term, webglRef, !termColors(s.theme, s.accent).background.startsWith('rgba'))
     fit.fit()
     termRef.current = term
     fitRef.current = fit
@@ -374,6 +368,7 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
     const term = termRef.current
     if (!term) return
     term.options.theme = termTheme
+    setWebgl(term, webglRef, !termColors(settings.theme, settings.accent).background.startsWith('rgba'))
     // Toggling forces xterm to re-measure glyphs once a custom font has loaded.
     term.options.fontFamily = 'monospace'
     term.options.fontFamily = terminalFontFamily(settings.fontFamily)
@@ -407,7 +402,7 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
 
   const tabRequest = useStore((s) => s.tabRequest)
   useEffect(() => {
-    if (tabRequest?.id !== tab.id) return
+    if (!tabRequest?.ids.includes(tab.id)) return
     if (tabRequest.action === 'reconnect') start()
     else disconnect()
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -545,6 +540,30 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
 
     </motion.div>
   )
+}
+
+/**
+ * WebGL is faster, but with a translucent background it paints dim and underlined cells on an opaque
+ * black box; the DOM renderer composites them correctly, so glass themes use it.
+ */
+function setWebgl(term: Terminal, ref: React.RefObject<WebglAddon | null>, enabled: boolean): void {
+  if (!enabled) {
+    ref.current?.dispose()
+    ref.current = null
+    return
+  }
+  if (ref.current) return
+  try {
+    const webgl = new WebglAddon()
+    webgl.onContextLoss(() => {
+      webgl.dispose()
+      if (ref.current === webgl) ref.current = null
+    })
+    term.loadAddon(webgl)
+    ref.current = webgl
+  } catch {
+    // No WebGL: the DOM renderer stays in place.
+  }
 }
 
 function quotePath(path: string): string {

@@ -63,7 +63,7 @@ interface State {
   filePaneRatio: number
   toasts: Toast[]
   /** Asks the TerminalView owning `id` to reconnect or disconnect (sent from the tab bar). */
-  tabRequest: { id: string; action: 'reconnect' | 'disconnect'; at: number } | null
+  tabRequest: { ids: string[]; action: 'reconnect' | 'disconnect'; at: number } | null
   modal: ModalState | null
   menu: { x: number; y: number; items: (MenuItem | 'sep')[] } | null
 
@@ -232,6 +232,10 @@ export const useStore = create<State>((set, get) => ({
     set({ filePaneRatio: ratio })
   }
 }))
+
+export function requestTabs(ids: string[], action: 'reconnect' | 'disconnect'): void {
+  useStore.setState({ tabRequest: { ids, action, at: Date.now() } })
+}
 
 let batchDone = 0
 function announceTransfer(task: TransferTask, all: TransferTask[]): void {

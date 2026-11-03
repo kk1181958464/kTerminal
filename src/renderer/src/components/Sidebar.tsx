@@ -11,6 +11,10 @@ import {
   MoreHorizontal,
   Pencil,
   Play,
+  RotateCw,
+  Ban,
+  CopyPlus,
+  Unplug,
   Plus,
   Search,
   ServerCog,
@@ -19,7 +23,7 @@ import {
   Trash2
 } from 'lucide-react'
 import type { Session } from '../../../shared/types'
-import { confirmDialog, openMenu, openMenuAt, toast, useStore, type MenuItem } from '../store'
+import { confirmDialog, openMenu, openMenuAt, requestTabs, toast, useStore, type MenuItem } from '../store'
 import { useSettings } from '../settings'
 import { resolveThemeId, themes } from '../theme'
 import { Avatar } from './ui'
@@ -205,6 +209,31 @@ function LocalTerminalEntry(): React.JSX.Element {
 }
 
 function SessionItem({ session }: { session: Session }): React.JSX.Element {
+  const connectionItems = (): MenuItem[] => {
+    const tabs = useStore.getState().tabs.filter((t) => t.sessionId === session.id)
+    const ids = (status: string): string[] => tabs.filter((t) => t.status === status).map((t) => t.id)
+    const connected = ids('connected')
+    const connecting = ids('connecting')
+    const items: MenuItem[] = []
+    if (connected.length) {
+      items.push({
+        label: connected.length > 1 ? `断开全部连接（${connected.length}）` : '断开连接',
+        icon: Unplug,
+        onClick: () => requestTabs(connected, 'disconnect')
+      })
+    }
+    if (connecting.length) items.push({ label: '取消连接', icon: Ban, onClick: () => requestTabs(connecting, 'disconnect') })
+    const dropped = [...ids('closed'), ...ids('error')]
+    if (!connected.length && !connecting.length && dropped.length)
+      items.push({ label: '重新连接', icon: RotateCw, onClick: () => requestTabs(dropped, 'reconnect') })
+    items.push(
+      tabs.length
+        ? { label: '再开一个连接', icon: CopyPlus, onClick: () => openTab(session) }
+        : { label: '连接', icon: Play, onClick: () => openTab(session) }
+    )
+    return items
+  }
+
   const openTab = useStore((s) => s.openTab)
   const openDialog = useStore((s) => s.openDialog)
   const deleteSession = useStore((s) => s.deleteSession)
@@ -213,7 +242,7 @@ function SessionItem({ session }: { session: Session }): React.JSX.Element {
   )
 
   const items = (): (MenuItem | 'sep')[] => [
-    { label: '连接', icon: Play, onClick: () => openTab(session) },
+    ...connectionItems(),
     { label: '编辑', icon: Pencil, onClick: () => openDialog(session) },
     {
       label: '复制地址',

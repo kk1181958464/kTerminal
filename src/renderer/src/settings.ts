@@ -115,6 +115,20 @@ export const useSettings = create<SettingsState>()(
   )
 )
 
+/** Installed Nerd Fonts supply prompt icons/powerline glyphs (oh-my-posh, starship) the main font lacks. */
+const NERD_FALLBACKS = [
+  'Symbols Nerd Font Mono',
+  'FiraCode Nerd Font Mono',
+  'CaskaydiaCove Nerd Font Mono',
+  'CaskaydiaMono Nerd Font Mono',
+  'JetBrainsMono Nerd Font Mono',
+  'MesloLGS NF',
+  'MesloLGM Nerd Font Mono',
+  'Hack Nerd Font Mono'
+]
+  .map((f) => `"${f}"`)
+  .join(', ')
+
 export function terminalFontFamily(family: string): string {
-  return `"${family}", "Cascadia Mono", Consolas, "Microsoft YaHei Mono", monospace`
+  return `"${family}", "Cascadia Mono", Consolas, ${NERD_FALLBACKS}, "Microsoft YaHei Mono", monospace`
 }

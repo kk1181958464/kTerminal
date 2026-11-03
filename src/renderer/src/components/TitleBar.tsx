@@ -1,7 +1,7 @@
 import clsx from 'clsx'
 import { Reorder } from 'framer-motion'
 import { Ban, CopyPlus, FolderOpen, Monitor, PanelLeft, PanelRightClose, Pencil, Plus, RotateCw, TerminalSquare, Unplug, X, XSquare } from 'lucide-react'
-import { openMenu, openMenuAt, useStore, type MenuItem, type Tab } from '../store'
+import { openMenu, openMenuAt, requestTabs, useStore, type MenuItem, type Tab } from '../store'
 import { useSettings } from '../settings'
 import { StatusDot } from './StatusDot'
 
@@ -43,7 +43,7 @@ export function TitleBar(): React.JSX.Element {
   }
 
   const request = (id: string, action: 'reconnect' | 'disconnect'): void =>
-    useStore.setState({ tabRequest: { id, action, at: Date.now() } })
+    requestTabs([id], action)
 
   const tabMenu = (e: React.MouseEvent, tab: Tab): void => {
     const local = tab.kind === 'local'
