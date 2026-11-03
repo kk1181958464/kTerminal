@@ -47,6 +47,14 @@ export function StatusBar(): React.JSX.Element {
               {tab.cols}×{tab.rows}
             </span>
           )}
+          {tab.kind === 'ssh' && tab.latency !== undefined && tab.status === 'connected' && (
+            <span
+              title="按键回显延迟"
+              className={clsx('px-1.5 tabular-nums', tab.latency >= 150 ? 'text-err' : tab.latency >= 50 ? 'text-warn' : '')}
+            >
+              延迟 {tab.latency}ms
+            </span>
+          )}
         </>
       ) : (
         <span className="px-1.5">就绪 · {sessionCount} 个会话</span>

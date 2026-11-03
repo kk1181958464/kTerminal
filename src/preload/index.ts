@@ -84,6 +84,11 @@ const api: Api = {
     shells: () => ipcRenderer.invoke('pty:shells'),
     spawn: (tabId, shellId, cols, rows, cwd) => ipcRenderer.invoke('pty:spawn', tabId, shellId, cols, rows, cwd)
   },
+  term: {
+    clipboardHasImageOnly: () => ipcRenderer.invoke('clipboard:hasImageOnly'),
+    stageClipboardImage: (tabId) => ipcRenderer.invoke('clipboard:stageImage', tabId),
+    stageFiles: (tabId, paths) => ipcRenderer.invoke('term:stageFiles', tabId, paths)
+  },
   appVersion: () => ipcRenderer.invoke('app:version'),
   getPathForFile: (file) => webUtils.getPathForFile(file)
 }

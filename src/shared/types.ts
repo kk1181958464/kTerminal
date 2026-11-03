@@ -112,6 +112,12 @@ export interface Api {
     /** `cwd` falls back to the home directory when missing or not a directory. */
     spawn(tabId: string, shellId: string, cols: number, rows: number, cwd?: string): Promise<ConnectResult>
   }
+  term: {
+    clipboardHasImageOnly(): Promise<boolean>
+    /** Saves the clipboard image where the tab's shell can read it (uploads for SSH tabs). */
+    stageClipboardImage(tabId: string): Promise<string | null>
+    stageFiles(tabId: string, paths: string[]): Promise<string[]>
+  }
   appVersion(): Promise<string>
   getPathForFile(file: File): string
 }

@@ -109,6 +109,9 @@ export function connectShell(
       if (!settled) fail(new Error('连接已关闭'))
       else if (conn.stream && !conn.disposed) send(wc, 'ssh:closed', tabId, lastError)
     })
+    // Disable Nagle: otherwise each keystroke typed while an earlier one is still unacknowledged
+    // waits for that ACK, adding up to a full round trip of input lag on slow links.
+    client.on('connect', () => client.setNoDelay(true))
     client.connect(config)
   })
 }

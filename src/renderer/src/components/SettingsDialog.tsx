@@ -43,6 +43,7 @@ import {
 } from '../theme'
 import { importCustomFonts, removeCustomFont } from '../fonts'
 import { commandRule, highlightRules } from '../highlight'
+import type { PredictMode } from '../predict'
 import { defaultHighlight, type HighlightRuleKey } from '../settings'
 import { promptDialog } from '../store'
 import { Segmented, Switch } from './ui'
@@ -920,6 +921,7 @@ function TerminalSection(): React.JSX.Element {
           </select>
         </Row>
       </Group>
+      <PredictGroup />
       <HighlightGroup />
     </>
   )
@@ -1071,6 +1073,30 @@ function DefaultShellRow(): React.JSX.Element {
             选择…
           </button>
         </div>
+      </Row>
+    </Group>
+  )
+}
+
+function PredictGroup(): React.JSX.Element {
+  const mode = useSettings((st) => st.predictiveEcho)
+  const set = useSettings((st) => st.set)
+  return (
+    <Group title="高延迟优化">
+      <Row
+        title="预测回显"
+        desc="输入时先在本地显示（淡色），收到服务器回显后校正；密码输入不会被预测。自动：回显延迟超过 50ms 时启用"
+      >
+        <Segmented<PredictMode>
+          id="predict"
+          value={mode}
+          onChange={(v) => set({ predictiveEcho: v })}
+          options={[
+            { value: 'auto', label: '自动' },
+            { value: 'on', label: '始终' },
+            { value: 'off', label: '关闭' }
+          ]}
+        />
       </Row>
     </Group>
   )

@@ -18,10 +18,11 @@ import {
   TextSelect
 } from 'lucide-react'
 import type { Session } from '../../../shared/types'
-import { toSessionInput, useStore, type Tab } from '../store'
+import { errorMessage, toast, toSessionInput, useStore, type Tab } from '../store'
 import { terminalFontFamily, useSettings } from '../settings'
 import { termColors, terminalTheme } from '../theme'
 import { Highlighter } from '../highlight'
+import { EchoPredictor } from '../predict'
 import { FilePanel } from './FilePanel'
 
 const spring = { type: 'spring', stiffness: 380, damping: 38 } as const
@@ -160,6 +161,7 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
     term.loadAddon(new WebLinksAddon((event, uri) => event.ctrlKey && window.open(uri)))
     const highlighter = new Highlighter(() => useSettings.getState().highlight)
     term.open(containerRef.current!)
+    const stopClampingIme = clampCompositionView(containerRef.current!)
     try {
       const webgl = new WebglAddon()
       webgl.onContextLoss(() => webgl.dispose())
@@ -174,18 +176,64 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
     const copy = (): void => {
       if (term.hasSelection()) navigator.clipboard.writeText(term.getSelection())
     }
-    const paste = (): void => {
-      navigator.clipboard.readText().then((text) => term.paste(text))
+    // Images can't be typed into a terminal: save them where the shell can read them (uploading for
+    // SSH tabs) and paste the path, which CLIs like Claude Code pick up as an attachment.
+    const pasteImage = async (): Promise<void> => {
+      try {
+        const path = await window.api.term.stageClipboardImage(tab.id)
+        if (!path) return
+        term.paste(quotePath(path))
+        toast(tab.kind === 'ssh' ? `图片已上传到服务器：${path}` : '已粘贴图片路径', 'success')
+      } catch (err) {
+        toast(`粘贴图片失败：${errorMessage(err)}`, 'error')
+      }
+    }
+    const paste = async (): Promise<void> => {
+      if (await window.api.term.clipboardHasImageOnly()) return pasteImage()
+      term.paste(await navigator.clipboard.readText())
+    }
+    // Plain Ctrl+V arrives as a DOM paste event that xterm handles; intercept image-only clipboards.
+    const onPaste = (e: ClipboardEvent): void => {
+      const data = e.clipboardData
+      if (!data || data.types.includes('text/plain')) return
+      if (![...data.items].some((item) => item.type.startsWith('image/'))) return
+      e.preventDefault()
+      e.stopPropagation()
+      pasteImage()
+    }
+    const onDragOver = (e: DragEvent): void => {
+      if (!e.dataTransfer?.types.includes('Files')) return
+      e.preventDefault()
+      e.dataTransfer.dropEffect = 'copy'
+    }
+    const onDrop = async (e: DragEvent): Promise<void> => {
+      const files = [...(e.dataTransfer?.files ?? [])]
+      if (!files.length) return
+      e.preventDefault()
+      const paths = files.map((f) => window.api.getPathForFile(f)).filter(Boolean)
+      try {
+        const staged = await window.api.term.stageFiles(tab.id, paths)
+        term.paste(staged.map(quotePath).join(' '))
+        term.focus()
+        if (tab.kind === 'ssh') toast(`已上传 ${staged.length} 个文件到服务器 /tmp`, 'success')
+      } catch (err) {
+        toast(`处理拖入的文件失败：${errorMessage(err)}`, 'error')
+      }
     }
 
-    // Ctrl+Shift+C / Ctrl+Shift+V copy & paste; plain Ctrl+C still sends SIGINT.
+    // Ctrl+Shift+C / Ctrl+Shift+V copy & paste; plain Ctrl+C still sends SIGINT. Plain Ctrl+V pastes too
+    // (Windows/Linux have no app menu supplying it). preventDefault stops the browser's own paste
+    // event, which xterm would handle as a second paste.
+    const mac = window.electron.process.platform === 'darwin'
     term.attachCustomKeyEventHandler((e) => {
-      if (e.type !== 'keydown' || !e.ctrlKey || !e.shiftKey) return true
-      if (e.code === 'KeyC') {
+      if (e.type !== 'keydown' || !e.ctrlKey || e.altKey || e.metaKey) return true
+      if (e.shiftKey && e.code === 'KeyC') {
+        e.preventDefault()
         copy()
         return false
       }
-      if (e.code === 'KeyV') {
+      if (e.code === 'KeyV' && (e.shiftKey || !mac)) {
+        e.preventDefault()
         paste()
         return false
       }
@@ -230,13 +278,47 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
       })
     }
     containerRef.current!.addEventListener('contextmenu', onContextMenu)
+    containerRef.current!.addEventListener('paste', onPaste, true)
+    containerRef.current!.addEventListener('dragover', onDragOver)
+    containerRef.current!.addEventListener('drop', onDrop)
 
-    term.onData((data) => window.api.ssh.write(tab.id, data))
+    let lastLatencyReport = 0
+    const predictor =
+      tab.kind === 'ssh'
+        ? new EchoPredictor(
+            {
+              write: (data) => term.write(data),
+              cursorAtLineEnd: () => {
+                const b = term.buffer.active
+                const line = b.getLine(b.baseY + b.cursorY)
+                return !line || line.translateToString(true, b.cursorX).length === 0
+              },
+              altScreen: () => term.buffer.active.type === 'alternate',
+              lineBeforeCursor: () => {
+                const b = term.buffer.active
+                return b.getLine(b.baseY + b.cursorY)?.translateToString(true, 0, b.cursorX) ?? ''
+              }
+            },
+            () => useSettings.getState().predictiveEcho,
+            (ms) => {
+              if (performance.now() - lastLatencyReport < 1000) return
+              lastLatencyReport = performance.now()
+              updateTab(tab.id, { latency: Math.round(ms) })
+            }
+          )
+        : null
+
+    term.onData((data) => {
+      predictor?.onInput(data)
+      window.api.ssh.write(tab.id, data)
+    })
     term.onResize(({ cols, rows }) => {
       window.api.ssh.resize(tab.id, cols, rows)
       updateTab(tab.id, { cols, rows })
     })
-    const offData = window.api.ssh.onData((id, data) => id === tab.id && term.write(highlighter.process(data)))
+    const offData = window.api.ssh.onData(
+      (id, data) => id === tab.id && term.write(highlighter.process(predictor ? predictor.onOutput(data) : data))
+    )
     const offClosed = window.api.ssh.onClosed((id, reason) => {
       if (id !== tab.id) return
       term.write(`\r\n\x1b[2m—— ${tab.kind === 'local' ? '进程已退出' : '连接已断开'} ——\x1b[0m\r\n`)
@@ -264,7 +346,11 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
     return () => {
       clearTimeout(fitTimer)
       observer.disconnect()
+      stopClampingIme()
       container.removeEventListener('contextmenu', onContextMenu)
+      container.removeEventListener('paste', onPaste, true)
+      container.removeEventListener('dragover', onDragOver)
+      container.removeEventListener('drop', onDrop)
       offData()
       offClosed()
       window.api.ssh.close(tab.id)
@@ -341,7 +427,7 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
       className={clsx('absolute inset-0 flex pr-2 pb-2', right ? 'flex-row' : 'flex-col')}
     >
       <div
-        className="surface relative min-h-[120px] min-w-[240px] flex-1 overflow-hidden"
+        className="surface relative min-h-[120px] min-w-[240px] flex-1 overflow-clip"
         style={{ background: termColors(settings.theme, settings.accent).background }}
       >
         {/* Padding lives on the wrapper: FitAddon measures the parent's border-box height, so
@@ -450,6 +536,29 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
 
     </motion.div>
   )
+}
+
+function quotePath(path: string): string {
+  if (!/[\s'"&()]/.test(path)) return path
+  return /^[a-z]:\\/i.test(path) ? `"${path}"` : `'${path.replace(/'/g, "'\\''")}'`
+}
+
+/**
+ * xterm places the IME composition box at the cursor. When a TUI parks the cursor near the right
+ * edge the box would stick out of the terminal; shift it left so the pinyin stays readable.
+ */
+function clampCompositionView(container: HTMLElement): () => void {
+  const view = container.querySelector<HTMLElement>('.composition-view')
+  if (!view) return () => {}
+  const clamp = (): void => {
+    if (!view.classList.contains('active')) return
+    const max = container.clientWidth - view.offsetWidth
+    const left = view.offsetLeft
+    if (left > max) view.style.left = `${Math.max(0, max)}px`
+  }
+  const observer = new MutationObserver(clamp)
+  observer.observe(view, { attributes: true, attributeFilter: ['style', 'class'], childList: true, characterData: true, subtree: true })
+  return () => observer.disconnect()
 }
 
 function Overlay({ children }: { children: React.ReactNode }): React.JSX.Element {

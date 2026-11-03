@@ -41,7 +41,9 @@ body,
 #root {
   height: 100%;
   margin: 0;
-  overflow: hidden;
+  /* clip, not hidden: hidden boxes can still be scrolled by the browser to reveal a focused
+     element (e.g. xterm's IME composition box), which slid the whole UI sideways. */
+  overflow: clip;
   user-select: none;
 }
 

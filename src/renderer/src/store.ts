@@ -17,6 +17,8 @@ export interface Tab {
   filesOpen: boolean
   cols?: number
   rows?: number
+  /** Measured keystroke echo latency (ms) for SSH tabs. */
+  latency?: number
 }
 
 export interface MenuItem {

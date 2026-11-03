@@ -14,6 +14,7 @@ import { getSettings, updateSettings } from './settings'
 import { importFonts, listFonts, readFont, removeFont } from './fonts'
 import { closeAllLocal, closeLocal, listShells, resizeLocal, spawnLocal, writeLocal } from './pty'
 import { checkForUpdates, getUpdateStatus, initUpdater, installUpdate, openReleasePage } from './updater'
+import { cleanupPasteDir, clipboardHasImageOnly, stageClipboardImage, stageDroppedFiles } from './clipboard'
 
 // Pin the data dir to "kTerminal" and carry over data from the pre-rename "XSSH" dir.
 if (!app.commandLine.hasSwitch('user-data-dir')) {
@@ -128,6 +129,7 @@ function registerIpc(): void {
   ipcMain.handle('pty:spawn', (e, tabId: string, shellId: string, cols: number, rows: number, cwd?: string) =>
     spawnLocal(e.sender, tabId, shellId, cols, rows, cwd)
   )
+  ipcMain.handle('clipboard:hasImageOnly', () => clipboardHasImageOnly())
   ipcMain.handle('update:status', () => getUpdateStatus())
   ipcMain.handle('update:check', () => checkForUpdates())
   ipcMain.on('update:install', () => installUpdate())
@@ -172,6 +174,8 @@ function registerIpc(): void {
   handle('sftp:mkdir', files.mkdirRemote)
   handle('sftp:rename', files.renameRemote)
   handle('sftp:remove', files.removeRemote)
+  handle('clipboard:stageImage', stageClipboardImage)
+  handle('term:stageFiles', stageDroppedFiles)
 
   ipcMain.handle('transfer:start', (e, req) => startTransfer(e.sender, req))
   ipcMain.on('transfer:cancel', (_e, id: string) => cancelTransfer(id))
@@ -254,6 +258,9 @@ app.on('before-quit', () => {
 
 app.whenReady().then(() => {
   releaseAll()
+  // The default menu is hidden but still owns Alt+<letter> accelerators (Alt+V opened "View"),
+  // swallowing keys meant for the terminal. macOS keeps it: Cmd+C/V/Q come from that menu.
+  if (process.platform !== 'darwin') Menu.setApplicationMenu(null)
 
   electronApp.setAppUserModelId('com.xssh.app')
 
@@ -272,10 +279,15 @@ app.whenReady().then(() => {
 })
 
 app.on('window-all-closed', () => {
-  closeAllShells()
-  closeAllLocal()
-  releaseAll()
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+// will-quit (not window-all-closed) also fires for app.quit(): tray "退出", update-and-restart.
+app.on('will-quit', () => {
+  closeAllShells()
+  closeAllLocal()
+  releaseAll()
+  cleanupPasteDir()
 })

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { CustomScheme } from './theme'
+import type { PredictMode } from './predict'
 
 export type CursorStyle = 'block' | 'bar' | 'underline'
 export type FilePanelPosition = 'right' | 'bottom'
@@ -63,6 +64,7 @@ export interface Settings {
   /** Working directory for new local terminals; null means the home directory. */
   localCwd: string | null
   autoUpdate: boolean
+  predictiveEcho: PredictMode
 }
 
 export const defaultSettings: Settings = {
@@ -85,7 +87,8 @@ export const defaultSettings: Settings = {
   highlight: defaultHighlight,
   defaultShell: null,
   localCwd: null,
-  autoUpdate: true
+  autoUpdate: true,
+  predictiveEcho: 'auto'
 }
 
 interface SettingsState extends Settings {

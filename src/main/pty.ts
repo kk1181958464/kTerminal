@@ -107,6 +107,10 @@ export function spawnLocal(
   }
 }
 
+export function isLocal(tabId: string): boolean {
+  return ptys.has(tabId)
+}
+
 /** The write/resize/close helpers return false when the tab isn't a local terminal. */
 export function writeLocal(tabId: string, data: string): boolean {
   const p = ptys.get(tabId)
