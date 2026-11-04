@@ -25,9 +25,9 @@ export function TitleBar(): React.JSX.Element {
       label: shell.name,
       hint: '本地',
       icon: Monitor,
-      onClick: () => openLocalTab(shell)
+      onClick: () => openLocalTab(shell),
+      secondary: { icon: FolderOpen, title: `在指定目录打开 ${shell.name}…`, onClick: () => openLocalTabIn(shell) }
     }))
-    if (items.length) items.push({ label: '在指定目录打开…', icon: FolderOpen, onClick: () => openLocalTabIn() })
     if (items.length && sessions.length) items.push('sep')
     items.push(
       ...sessions.slice(0, 12).map((s) => ({

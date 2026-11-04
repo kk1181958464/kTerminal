@@ -188,16 +188,20 @@ function LocalTerminalEntry(): React.JSX.Element {
         <button
           title="选择 Shell 或目录"
           onClick={(e) =>
-            openMenuAt(e.currentTarget, [
-              ...shells.map((shell) => ({
+            openMenuAt(
+              e.currentTarget,
+              shells.map((shell) => ({
                 label: shell.name,
                 icon: Monitor,
                 active: shell.id === current?.id,
-                onClick: () => openLocalTab(shell)
-              })),
-              'sep',
-              { label: '在指定目录打开…', icon: FolderOpen, onClick: () => openLocalTabIn() }
-            ])
+                onClick: () => openLocalTab(shell),
+                secondary: {
+                  icon: FolderOpen,
+                  title: `在指定目录打开 ${shell.name}…`,
+                  onClick: () => openLocalTabIn(shell)
+                }
+              }))
+            )
           }
           className="icon-btn h-7 w-7"
         >

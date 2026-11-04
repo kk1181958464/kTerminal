@@ -57,23 +57,37 @@ function ContextMenu(): React.JSX.Element | null {
         item === 'sep' ? (
           <div key={i} className="my-1 h-px bg-line" />
         ) : (
-          <button
-            key={i}
-            disabled={item.disabled}
-            onClick={() => {
-              useStore.setState({ menu: null })
-              item.onClick()
-            }}
-            className={clsx(
-              'flex w-full cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] transition disabled:pointer-events-none disabled:opacity-40',
-              item.danger ? 'text-err hover:bg-err/10' : 'text-fg hover:bg-fg/[0.07]',
-              item.active && 'bg-accent/12 text-accent'
+          <div key={i} className="flex items-center gap-0.5">
+            <button
+              disabled={item.disabled}
+              onClick={() => {
+                useStore.setState({ menu: null })
+                item.onClick()
+              }}
+              className={clsx(
+                'flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-[12.5px] transition disabled:pointer-events-none disabled:opacity-40',
+                item.danger ? 'text-err hover:bg-err/10' : 'text-fg hover:bg-fg/[0.07]',
+                item.active && 'bg-accent/12 text-accent'
+              )}
+            >
+              {item.icon && <item.icon size={14} />}
+              {item.label}
+              {item.hint && <span className="ml-auto pl-6 text-[11px] text-dim">{item.hint}</span>}
+            </button>
+            {item.secondary && (
+              <button
+                title={item.secondary.title}
+                disabled={item.disabled}
+                onClick={() => {
+                  useStore.setState({ menu: null })
+                  item.secondary!.onClick()
+                }}
+                className="grid h-7 w-7 shrink-0 cursor-pointer place-items-center rounded-md text-dim transition hover:bg-fg/[0.07] hover:text-accent"
+              >
+                <item.secondary.icon size={14} />
+              </button>
             )}
-          >
-            {item.icon && <item.icon size={14} />}
-            {item.label}
-            {item.hint && <span className="ml-auto pl-6 text-[11px] text-dim">{item.hint}</span>}
-          </button>
+          </div>
         )
       )}
     </div>

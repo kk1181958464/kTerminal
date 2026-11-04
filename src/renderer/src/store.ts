@@ -29,6 +29,8 @@ export interface MenuItem {
   danger?: boolean
   disabled?: boolean
   active?: boolean
+  /** An extra icon button at the right end of the row, for a variant of the main action. */
+  secondary?: { icon: React.ComponentType<{ size?: number }>; title: string; onClick: () => void }
 }
 
 export type ModalState =
