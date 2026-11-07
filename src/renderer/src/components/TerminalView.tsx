@@ -252,6 +252,9 @@ export function TerminalView({ tab, active }: { tab: Tab; active: boolean }): Re
 
     const onContextMenu = (e: MouseEvent): void => {
       e.preventDefault()
+      // Apps with mouse reporting on (Claude CLI, vim with mouse=a, tmux…) get the right click
+      // themselves and often paste on it; pasting here as well would insert the text twice.
+      if (term.modes.mouseTrackingMode !== 'none' && !e.shiftKey) return
       if (useSettings.getState().rightClickPaste) {
         // Xshell/PuTTY style: copy when there is a selection, otherwise paste.
         if (term.hasSelection()) {
